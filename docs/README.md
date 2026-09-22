@@ -19,7 +19,7 @@ Take part in the [Knowii community](https://www.store.dsebastien.net/product/kno
 
 ## Quick start
 
-1. Install and enable the plugin
+1. Install the plugin from the [community plugin directory](https://community.obsidian.md/plugins/knowii-community) and enable it
 2. Click the Knowii icon in the ribbon, or run **Open Knowii**
 3. Sign in with your Knowii account
 

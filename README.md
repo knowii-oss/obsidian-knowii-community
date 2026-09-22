@@ -15,7 +15,7 @@ Knowii is a community of practice for knowledge workers who want to organize the
 
 ## Getting started
 
-1. Install and enable the plugin.
+1. Install the plugin from the community plugin directory ([Knowii Community](https://community.obsidian.md/plugins/knowii-community)) and enable it. It also ships with the Obsidian Starter Kit.
 2. Click the Knowii icon in the ribbon, or run the **Open Knowii** command.
 3. Sign in with your Knowii account. Not a member yet? The welcome card points you to everything Knowii offers.
 
