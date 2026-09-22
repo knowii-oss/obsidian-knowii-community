@@ -2,7 +2,7 @@
     "id": "knowii-community",
     "name": "Knowii Community",
     "description": "Take part in the Knowii community without leaving your vault: feed, spaces, messages and events in a pane.",
-    "version": "0.0.0",
+    "version": "1.0.0",
     "minAppVersion": "1.13.0",
     "isDesktopOnly": false,
     "author": "Sébastien Dubois",
