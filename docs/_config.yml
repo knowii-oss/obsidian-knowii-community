@@ -1,0 +1,33 @@
+title: Knowii Community
+description: Documentation for the Knowii Community Obsidian plugin.
+url: https://dsebastien.github.io
+baseurl: /obsidian-knowii-community
+
+remote_theme: just-the-docs/just-the-docs
+
+plugins:
+    - jekyll-remote-theme
+
+aux_links:
+    GitHub: https://github.com/dsebastien/obsidian-knowii-community
+
+search_enabled: true
+search:
+    heading_level: 3
+    previews: 2
+    preview_words_before: 5
+    preview_words_after: 10
+
+heading_anchors: true
+color_scheme: light
+
+exclude:
+    - SUMMARY.md
+
+footer_content: >-
+    Made by <a href="https://dsebastien.net">Sébastien Dubois</a>.
+    Support this plugin: <a href="https://www.store.dsebastien.net/product/knowii-community/">Join Knowii</a> &middot;
+    <a href="https://github.com/sponsors/dsebastien">GitHub Sponsors</a> &middot;
+    <a href="https://www.buymeacoffee.com/dsebastien">Buy me a coffee</a> &middot;
+    <a href="https://youtube.com/@dsebastien">YouTube</a> &middot;
+    <a href="https://store.dsebastien.net">Products</a>

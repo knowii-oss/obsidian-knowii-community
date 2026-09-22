@@ -1,0 +1,231 @@
+@import 'tailwindcss';
+
+/* ========================================
+   SUPPORT & UI SECTIONS
+   ======================================== */
+
+/* Support section */
+.support-header-margin {
+    @apply mb-5;
+}
+
+/* A declarative-settings `render:` hook draws into the row's own
+   `.setting-item`, which Obsidian styles as a flex ROW. The support block is a
+   stack of full-width `.setting-item` children, so the row has to go back to
+   block flow — otherwise heading, buttons and badge sit side by side.
+
+   This rule MUST stay unlayered. Unlayered CSS beats layered CSS whatever the
+   specificity, and Obsidian's own `.setting-item { display: flex }` is
+   unlayered. A plugin that wraps its stylesheet in `@layer components` will
+   find this computes to `flex` in a live vault no matter how many times the
+   class is doubled — verified the hard way with getComputedStyle. */
+.settings-stack {
+    display: block;
+}
+
+/* ========================================
+   "WHAT'S NEW" TAB
+   Opened once after a plugin update (see
+   src/app/ui/whats-new-view.ts). One tab per
+   plugin, so these rules use plugin-id-prefixed
+   classes (no conflicts when sibling plugins
+   ship this feature) and Obsidian theme
+   variables throughout.
+   ======================================== */
+
+/* The content element carries this class, so the layout never depends on
+   Obsidian's internal `.view-content` markup. The container class is repeated
+   to outrank Obsidian's own `.view-content` padding. */
+.knowii-community-whats-new-view .knowii-community-whats-new-content {
+    @apply overflow-y-auto px-7 pt-6 pb-8;
+}
+
+/* Readable measure, centered in wide tabs. One wrapper rather than centering
+   each child: a child's `margin` shorthand would reset `margin-inline: auto`. */
+.knowii-community-whats-new-body {
+    @apply mx-auto max-w-[720px];
+}
+
+.knowii-community-whats-new-title {
+    @apply mt-0 mb-4;
+}
+
+/* Release notes card */
+.knowii-community-whats-new-notes {
+    @apply mx-0 mt-1 mb-6 border border-solid px-5 pt-4 pb-8;
+    border-color: var(--background-modifier-border);
+    border-radius: var(--radius-m, 8px);
+    background-color: var(--background-secondary);
+}
+
+.knowii-community-whats-new-notes > :first-child {
+    @apply mt-0;
+}
+
+/* Version headings stay compact inside the tab */
+.knowii-community-whats-new-notes h1,
+.knowii-community-whats-new-notes h2 {
+    @apply mt-3 mb-2;
+    font-size: var(--h4-size, 1.15em);
+}
+
+.knowii-community-whats-new-notes h3 {
+    @apply mt-4 mb-1;
+    font-size: var(--h5-size, 1em);
+}
+
+/* Separator between versions (emitted between changelog sections) */
+.knowii-community-whats-new-notes hr {
+    @apply my-6 border-t border-solid;
+    border-color: var(--background-modifier-border);
+}
+
+/* Community + support block. Rows keep the theme's own `.setting-item`
+   padding: many themes render them as cards, and overriding their padding
+   would push the text flush against the card edge. */
+.knowii-community-whats-new-body .knowii-community-whats-new-links {
+    @apply mt-6;
+}
+
+.knowii-community-whats-new-body .knowii-community-whats-new-links .setting-item {
+    @apply gap-4 border-t-0;
+}
+
+.knowii-community-whats-new-body .knowii-community-whats-new-links .setting-item-description {
+    @apply pr-3;
+}
+
+/* ========================================
+   COMMUNITY PANE
+   The pane hosts the community itself; these
+   rules only dress the frame around it. Brand
+   magenta comes from the Knowii web palette;
+   everything else follows the theme.
+   ======================================== */
+
+.knowii-community-content {
+    --knowii-magenta: #e5007d;
+    --knowii-magenta-text: #ff1493;
+    @apply flex h-full flex-col overflow-hidden p-0;
+}
+
+/* Toolbar */
+.knowii-community-toolbar {
+    @apply flex shrink-0 flex-wrap items-center gap-1 px-2 py-1.5;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.knowii-community-brand {
+    @apply mr-1 flex items-center gap-1.5 pr-2 font-semibold;
+    border-right: 1px solid var(--background-modifier-border);
+    color: var(--text-normal);
+}
+
+.knowii-community-brand-mark {
+    @apply flex items-center;
+    color: var(--knowii-magenta-text);
+}
+
+.knowii-community-brand-mark svg {
+    @apply h-[18px] w-[18px];
+}
+
+.knowii-community-nav,
+.knowii-community-shortcuts,
+.knowii-community-actions {
+    @apply flex items-center gap-0.5;
+}
+
+.knowii-community-shortcuts {
+    @apply flex-1 flex-wrap;
+}
+
+.knowii-community-actions {
+    @apply ml-auto;
+}
+
+.knowii-community-content .knowii-community-button {
+    @apply flex h-7 items-center gap-1 rounded-md px-1.5;
+    color: var(--text-muted);
+}
+
+.knowii-community-content .knowii-community-button:hover {
+    color: var(--text-normal);
+    background-color: var(--background-modifier-hover);
+}
+
+.knowii-community-content .knowii-community-button.is-disabled {
+    @apply pointer-events-none opacity-40;
+}
+
+.knowii-community-button-icon {
+    @apply flex items-center;
+}
+
+.knowii-community-button-icon svg {
+    @apply h-4 w-4;
+}
+
+.knowii-community-shortcut-label {
+    @apply text-xs;
+}
+
+/* Sidebar-narrow toolbars keep the icons and drop the words. */
+@container (max-width: 640px) {
+    .knowii-community-shortcut-label {
+        @apply hidden;
+    }
+}
+
+.knowii-community-body {
+    @apply relative flex min-h-0 flex-1;
+    container-type: inline-size;
+}
+
+.knowii-community-content .knowii-community-webview {
+    @apply h-full w-full flex-1 border-0;
+    display: flex;
+}
+
+/* Welcome, unsupported and error cards */
+.knowii-community-card {
+    @apply m-auto flex max-w-[440px] flex-col items-center gap-3 px-8 py-10 text-center;
+}
+
+.knowii-community-card-mark {
+    @apply mb-1 flex h-16 w-16 items-center justify-center rounded-full;
+    color: var(--knowii-magenta);
+    background-color: color-mix(in srgb, var(--knowii-magenta) 12%, transparent);
+}
+
+.knowii-community-card-mark svg {
+    @apply h-9 w-9;
+}
+
+.knowii-community-card-title {
+    @apply m-0;
+}
+
+.knowii-community-card-text {
+    @apply m-0;
+    color: var(--text-muted);
+}
+
+.knowii-community-card-buttons {
+    @apply mt-2 flex flex-wrap justify-center gap-2;
+}
+
+.knowii-community-content .knowii-community-card-button.mod-cta {
+    background-color: var(--knowii-magenta);
+    color: #fff;
+}
+
+.knowii-community-content .knowii-community-card-button.mod-cta:hover {
+    background-color: var(--knowii-magenta-text);
+}
+
+.knowii-community-card-hint {
+    @apply m-0 text-xs;
+    color: var(--text-faint);
+}

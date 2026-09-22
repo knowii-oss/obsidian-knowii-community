@@ -1,0 +1,57 @@
+{
+    "compilerOptions": {
+        "baseUrl": ".",
+        "lib": ["DOM", "ESNext"],
+        // Pin the ambient type roots. Without this, TypeScript auto-scans
+        // top-level node_modules/@types only; @types/node arrives transitively
+        // (via @types/bun -> bun-types) and can end up NESTED, at which point
+        // every node:* import silently types as `error` and the catalog
+        // reviewer sees ~80 no-unsafe-* warnings that never reproduce locally.
+        // With this line, a missing package is instead a hard TS2688 at build.
+        "types": ["bun", "node"],
+        "target": "ESNext",
+        "module": "ESNext",
+        "moduleDetection": "force",
+        // Bundler mode
+        "moduleResolution": "bundler",
+        "jsx": "react-jsx",
+        "allowJs": true,
+        "allowImportingTsExtensions": true,
+        "verbatimModuleSyntax": true,
+        "esModuleInterop": true,
+        "importHelpers": true,
+        "inlineSources": true,
+        "isolatedModules": true,
+        "resolveJsonModule": true,
+        "checkJs": false,
+
+        // Maximum strictness
+        "strict": true,
+        "alwaysStrict": true,
+        "strictBindCallApply": true,
+        "strictFunctionTypes": true,
+        "strictNullChecks": true,
+        "strictPropertyInitialization": true,
+        "noFallthroughCasesInSwitch": true,
+        "noImplicitAny": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitOverride": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        "noImplicitReturns": true,
+        "noImplicitThis": true,
+        "noPropertyAccessFromIndexSignature": true,
+        "allowUnreachableCode": false,
+        "allowUnusedLabels": false,
+        "skipLibCheck": true,
+
+        // Output
+        "declaration": false,
+        "declarationMap": false,
+        "noEmit": true,
+        "noEmitOnError": true,
+        "sourceMap": true
+    },
+    "include": ["src/**/*", "eslint.config.ts", "commitlint.config.ts"],
+    "exclude": ["node_modules", "dist"]
+}
