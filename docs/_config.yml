@@ -1,6 +1,6 @@
 title: Knowii Community
 description: Documentation for the Knowii Community Obsidian plugin.
-url: https://dsebastien.github.io
+url: https://knowii-oss.github.io
 baseurl: /obsidian-knowii-community
 
 remote_theme: just-the-docs/just-the-docs
@@ -9,7 +9,7 @@ plugins:
     - jekyll-remote-theme
 
 aux_links:
-    GitHub: https://github.com/dsebastien/obsidian-knowii-community
+    GitHub: https://github.com/knowii-oss/obsidian-knowii-community
 
 search_enabled: true
 search:

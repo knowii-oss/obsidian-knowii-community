@@ -38,7 +38,7 @@ Knowii is a community of practice for knowledge workers who want to organize the
 
 ## Documentation
 
-- [User guide](https://dsebastien.github.io/obsidian-knowii-community/)
+- [User guide](https://knowii-oss.github.io/obsidian-knowii-community/)
 - [Changelog](./CHANGELOG.md)
 
 ## Development

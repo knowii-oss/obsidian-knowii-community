@@ -17,12 +17,12 @@
     "private": true,
     "repository": {
         "type": "git",
-        "url": "git+https://github.com/dsebastien/obsidian-knowii-community.git"
+        "url": "git+https://github.com/knowii-oss/obsidian-knowii-community.git"
     },
     "bugs": {
-        "url": "https://github.com/dsebastien/obsidian-knowii-community/issues"
+        "url": "https://github.com/knowii-oss/obsidian-knowii-community/issues"
     },
-    "homepage": "https://github.com/dsebastien/obsidian-knowii-community",
+    "homepage": "https://github.com/knowii-oss/obsidian-knowii-community",
     "engines": {
         "node": ">=20.0.0",
         "npm": ">=10.1.0"
