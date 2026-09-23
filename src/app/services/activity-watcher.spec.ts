@@ -327,8 +327,28 @@ describe('whole-community watch in a check', () => {
             }),
             '/internal_api/spaces?per_page=100': ok({
                 records: [
-                    { id: 5, name: 'Obsidian', slug: 'obsidian', post_type: 'chat' },
-                    { id: 6, name: 'Say Hello', slug: 'say-hello', post_type: 'basic' }
+                    {
+                        id: 5,
+                        name: 'Obsidian',
+                        slug: 'obsidian',
+                        post_type: 'chat',
+                        is_space_member: true
+                    },
+                    {
+                        id: 6,
+                        name: 'Say Hello',
+                        slug: 'say-hello',
+                        post_type: 'basic',
+                        is_space_member: true
+                    },
+                    // Visible but not joined: never read, never listed in the settings.
+                    {
+                        id: 7,
+                        name: 'Masterminds',
+                        slug: 'masterminds',
+                        post_type: 'chat',
+                        is_space_member: false
+                    }
                 ]
             }),
             '/internal_api/spaces/5': ok({
@@ -366,10 +386,11 @@ describe('whole-community watch in a check', () => {
                 records: [{ id: 5, name: 'Ann', community_member_id: 9 }]
             })
         }
+        const transport = fakeTransport('electron-session', routes)
         const client = new CommunityClient({
             baseUrl: () => 'https://www.knowii.net',
             watchOptions: () => ({ since, mutedSpaceIds: new Set() }),
-            transports: () => [fakeTransport('electron-session', routes)],
+            transports: () => [transport],
             onSetCookies: () => {}
         })
         const state = await new ActivityWatcher(client, host()).check()
@@ -383,6 +404,9 @@ describe('whole-community watch in a check', () => {
         // The room-level "new messages in Obsidian" item is replaced by the message itself.
         expect(keys.filter((key) => key.startsWith('room:room-obs'))).toEqual([])
         expect(client.knownSpaces().map((space) => space.slug)).toEqual(['obsidian', 'say-hello'])
+        expect(transport.calls.some((path) => path.startsWith('/internal_api/spaces/7'))).toBe(
+            false
+        )
     })
 })
 

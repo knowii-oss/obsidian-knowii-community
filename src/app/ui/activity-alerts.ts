@@ -3,6 +3,12 @@ import type { ActivityItem } from '../domain/community-activity'
 import { categoryInfo } from '../domain/community-activity'
 import { KNOWII_ICON_ID } from '../assets/knowii-icon'
 import { log } from '../../utils/log'
+import type { DesktopNotificationMode } from '../types/plugin-settings.intf'
+
+/** Whether a system notification should show now. */
+export function wantsDesktopNotification(mode: DesktopNotificationMode, focused: boolean): boolean {
+    return 'always' === mode || ('background' === mode && !focused)
+}
 
 const CLS = 'knowii-community'
 
@@ -12,8 +18,8 @@ const NOTICE_DURATION_MS = 10_000
 
 export interface AlertOptions {
     readonly notices: boolean
-    /** System notifications, only while Obsidian is not focused. */
-    readonly desktop: boolean
+    /** System notifications: always, only while Obsidian is in the background, or never. */
+    readonly desktop: DesktopNotificationMode
     /** Open one item in the pane. */
     readonly open: (item: ActivityItem) => void
     /** Show the full list of what's new. */
@@ -40,7 +46,7 @@ export function announceItems(items: readonly ActivityItem[], options: AlertOpti
             )
         }
     }
-    if (options.desktop && !document.hasFocus()) {
+    if (wantsDesktopNotification(options.desktop, document.hasFocus())) {
         for (const item of individual) {
             showDesktopNotification(item.title, describe(item), () => options.open(item))
         }
@@ -63,7 +69,7 @@ export function announceBacklog(count: number, options: AlertOptions): void {
     if (options.notices) {
         showSummaryNotice(text, options.openList)
     }
-    if (options.desktop && !document.hasFocus()) {
+    if (wantsDesktopNotification(options.desktop, document.hasFocus())) {
         showDesktopNotification('Knowii', text, options.openList)
     }
 }

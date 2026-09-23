@@ -2,6 +2,40 @@ import type { ActivityCategory } from '../domain/community-activity'
 import { ACTIVITY_CATEGORIES } from '../domain/community-activity'
 import type { StoredSession } from '../domain/session-cookies'
 
+/** When system notifications are shown: always, only while Obsidian is in the background, or never. */
+export type DesktopNotificationMode = 'always' | 'background' | 'off'
+
+export const DESKTOP_NOTIFICATION_MODES: readonly DesktopNotificationMode[] = [
+    'always',
+    'background',
+    'off'
+]
+
+export function isDesktopNotificationMode(value: unknown): value is DesktopNotificationMode {
+    return (
+        'string' === typeof value &&
+        (DESKTOP_NOTIFICATION_MODES as readonly string[]).includes(value)
+    )
+}
+
+/**
+ * The system-notification mode stored on disk. Before 1.2.0 it was the
+ * boolean `showDesktopNotifications` (on meant "while in the background");
+ * members who had it on now get notifications always, as the default.
+ */
+export function readDesktopNotificationMode(data: {
+    desktopNotifications?: unknown
+    showDesktopNotifications?: unknown
+}): { mode: DesktopNotificationMode; migrated: boolean } {
+    if (isDesktopNotificationMode(data.desktopNotifications)) {
+        return { mode: data.desktopNotifications, migrated: false }
+    }
+    if (false === data.showDesktopNotifications) {
+        return { mode: 'off', migrated: true }
+    }
+    return { mode: 'always', migrated: true }
+}
+
 /** Where the community pane opens. */
 export type PaneLocation = 'tab' | 'right' | 'left'
 
@@ -27,8 +61,8 @@ export interface PluginSettings {
     checkIntervalSeconds: number
     /** Announce new activity with an Obsidian notice. */
     showNotices: boolean
-    /** Announce new activity with a system notification while Obsidian is in the background. */
-    showDesktopNotifications: boolean
+    /** When new activity also gets a system notification. */
+    desktopNotifications: DesktopNotificationMode
     /** Unread counts in the status bar. */
     showStatusBarBadge: boolean
     /** Unread total on the ribbon icon. */
@@ -75,7 +109,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     notificationsEnabled: true,
     checkIntervalSeconds: DEFAULT_CHECK_INTERVAL_SECONDS,
     showNotices: true,
-    showDesktopNotifications: true,
+    desktopNotifications: 'always',
     showStatusBarBadge: true,
     showRibbonBadge: true,
     notifyCategories: DEFAULT_NOTIFY_CATEGORIES,

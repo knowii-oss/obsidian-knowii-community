@@ -12,10 +12,10 @@ Knowii is a community of practice for knowledge workers who want to organize the
 - **Commands**: open Knowii, jump straight to the feed or your messages, reload the pane, or open the current page in your browser. Bind them to hotkeys if you like.
 - **Picks up where you left off**: the pane reopens the page you were on.
 - **Zoom**: shrink or enlarge the community to fit a narrow sidebar.
-- **Notifications in Obsidian**: new direct messages, chat messages, thread replies, mentions, comments, posts, reactions, events and new members pop up as notices (and as system notifications while Obsidian is in the background). Click one to open it in the pane. Every kind can be switched off.
+- **Notifications in Obsidian**: new direct messages, chat messages, thread replies, mentions, comments, posts, reactions, events and new members pop up as notices and as system notifications (always, only in the background, or never: your choice). Click one to open it in the pane. Every kind can be switched off.
 - **Unread counts**: unread notifications and messages in the status bar, the total as a badge on the ribbon icon.
 - **What's new list**: recent activity, newest first, unread in bold (Gmail style), searchable (`is:unread` for unread only). Open it from the command palette, the status bar, the pane's toolbar or any "unread" notice. Enter opens the item.
-- **The whole community, not only your notifications**: new posts, comments and chat messages in every space (switch any space off). Your own are left out.
+- **The whole community, not only your notifications**: new posts, comments and chat messages in every space you belong to (switch any space off). Your own are left out.
 - **Mark as read, archive**: per item, or all at once. Notifications, conversations and threads are marked read (and notifications archived) on Knowii itself, so the web app agrees.
 - **Ribbon right-click**: the latest unread items straight in a menu, plus "Show what's new" and "Check now".
 - **Admin shortcuts**: community admins get an Admin menu in the pane (Dashboard, Audience), the same entries in the ribbon menu, and matching commands.

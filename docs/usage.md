@@ -13,14 +13,14 @@ Sign in once: the pane keeps its own session, separate from your browser, and re
 
 ## The toolbar
 
-Above the community, the toolbar offers back, forward and reload, shortcuts to the home page, the feed, your messages, notifications, events and members, and a button to open the current page in your browser. In a narrow sidebar the shortcuts show icons only; hover them for their names.
+Above the community, the toolbar offers back, forward and reload, shortcuts to the home page, the feed, your messages, notifications, events and members, an inbox button with your unread count (opens the "what's new" list), an **Admin** menu for community admins, and a button to open the current page in your browser. In a narrow sidebar the shortcuts show icons only; hover them for their names.
 
 ## Notifications
 
 Once you are signed in, the plugin checks Knowii in the background (every minute by default) and tells you about new activity:
 
 - **Notices** in Obsidian for each new item: who, what, and a short quote. Click a notice to open the item in the pane. More than three new items at once are folded into one summary notice.
-- **System notifications** for the same items while Obsidian is in the background. Click one to bring Obsidian back on that item.
+- **System notifications** for the same items (by default always; choose "only when Obsidian is in the background" or "never" in the settings). Click one to bring Obsidian back on that item.
 - **Status bar**: unread notifications (bell) and unread conversations and threads (speech bubble). Click it to see what's new.
 - **Ribbon badge**: the total unread count on the Knowii icon.
 
@@ -50,7 +50,7 @@ By default the plugin does not stop at what Knowii notifies you about. It also w
 - new posts (posts, events), and new comments on them,
 - new messages in every chat space, thread replies included.
 
-Your own posts, comments and messages are left out, and nothing from before you turned the watch on is replayed. Every space has its own switch under **Settings → Watch the whole community** (the list appears after the first check). Chat spaces with unread messages are read on every check; the others take turns, so each is looked at every few minutes.
+Only the spaces you belong to are watched (spaces you can see but have not joined are left alone, and private spaces you cannot open are never listed). Your own posts, comments and messages are left out, and nothing from before you turned the watch on is replayed. Every space has its own switch under **Settings → Watch the whole community** (the list appears after the first check). Chat spaces with unread messages are read on every check; the others take turns, so each is looked at every few minutes.
 
 These items use the same kinds as the rest (new posts, comments and replies, chat messages, thread replies), so the **Notify me about** switches apply to them too.
 
@@ -117,6 +117,17 @@ Treat that file like a password: anyone with a copy can use your Knowii account.
 | Open Knowii admin: audience       | Member management (admins only)                                      |
 | Reload the Knowii pane            | Reloads the community (only when the pane is open)                   |
 | Open Knowii in your browser       | Opens the current page, or the community home, in your browser       |
+
+## If you don't see system notifications
+
+The plugin hands notifications to your operating system; the system decides whether to show them. When notices appear in Obsidian but nothing pops up on your desktop:
+
+- **Check the plugin setting**: Settings → Knowii Community → System notifications should be **Always** (or **Only when Obsidian is in the background**, then switch to another app to see them).
+- **Windows**: Settings → System → Notifications: notifications must be on, and on for Obsidian. **Do not disturb** (Focus assist on older versions) holds them back.
+- **macOS**: System Settings → Notifications → Obsidian: allow notifications (macOS may ask the first time). A **Focus** mode (Do Not Disturb, Sleep, Work…) holds them back.
+- **Linux**: your desktop's notification service must be running, and not in do-not-disturb mode (on Omarchy: the indicator in the top bar, or `omarchy-toggle-notification-silencing`).
+
+Run **Check Knowii for new activity now** after changing something: if there is anything unread, a notification follows.
 
 ## Mobile
 

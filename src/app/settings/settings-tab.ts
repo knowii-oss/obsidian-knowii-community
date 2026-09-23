@@ -11,6 +11,7 @@ import {
     ZOOM_STEP_PERCENT,
     isActivityCategory,
     isCheckInterval,
+    isDesktopNotificationMode,
     isPaneLocation,
     isValidZoomPercent
 } from '../types/plugin-settings.intf'
@@ -53,7 +54,6 @@ const TOGGLE_KEYS = [
     'showRibbonIcon',
     'notificationsEnabled',
     'showNotices',
-    'showDesktopNotifications',
     'showStatusBarBadge',
     'showRibbonBadge',
     'watchWholeCommunity'
@@ -161,9 +161,17 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                     },
                     {
                         name: 'System notifications',
-                        desc: "Also use your computer's notifications while Obsidian is in the background.",
+                        desc: "Also use your computer's notifications for new activity. Click one to open the item in Obsidian.",
                         visible: () => this.plugin.settings.notificationsEnabled,
-                        control: { type: 'toggle', key: 'showDesktopNotifications' }
+                        control: {
+                            type: 'dropdown',
+                            key: 'desktopNotifications',
+                            options: {
+                                always: 'Always',
+                                background: 'Only when Obsidian is in the background',
+                                off: 'Never'
+                            }
+                        }
                     },
                     {
                         name: 'Unread counts in the status bar',
@@ -315,6 +323,8 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
         switch (key) {
             case 'checkIntervalSeconds':
                 return String(this.plugin.settings.checkIntervalSeconds)
+            case 'desktopNotifications':
+                return this.plugin.settings.desktopNotifications
             case 'paneLocation':
                 return this.plugin.settings.paneLocation
             case 'zoomPercent':
@@ -370,6 +380,14 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
             return
         }
         switch (key) {
+            case 'desktopNotifications':
+                if (!isDesktopNotificationMode(value)) {
+                    throw new Error(`Setting "${key}" expects always, background or off.`)
+                }
+                await this.plugin.updateSettings((draft) => {
+                    draft.desktopNotifications = value
+                })
+                return
             case 'checkIntervalSeconds': {
                 const seconds = Number(value)
                 if (!isCheckInterval(seconds)) {

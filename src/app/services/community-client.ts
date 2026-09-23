@@ -142,9 +142,13 @@ export class CommunityClient {
         this.participants.clear()
     }
 
-    /** Spaces seen on the last check (for the settings' per-space switches). */
+    /**
+     * Spaces the member belongs to, as of the last check (for the settings'
+     * per-space switches). Spaces they can see but have not joined are left
+     * out: there is nothing of theirs to watch there.
+     */
     knownSpaces(): readonly WatchableSpace[] {
-        return this.spacesCache?.spaces ?? []
+        return (this.spacesCache?.spaces ?? []).filter((space) => space.isMember)
     }
 
     // -----------------------------------------------------------------------
@@ -269,9 +273,10 @@ export class CommunityClient {
             items.push(...feedItems(posts, details, member, watch))
         }
 
-        // New messages in every chat space not muted.
+        // New messages in every chat space the member belongs to and did not
+        // mute. Spaces they are not in would only be refused.
         const chatSpaces = spaces.filter(
-            (space) => 'chat' === space.kind && !watch.mutedSpaceIds.has(space.id)
+            (space) => 'chat' === space.kind && space.isMember && !watch.mutedSpaceIds.has(space.id)
         )
         let lookups = 0
         for (const space of chatSpaces) {

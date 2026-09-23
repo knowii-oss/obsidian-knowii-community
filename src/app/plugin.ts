@@ -6,7 +6,8 @@ import {
     isPaneLocation,
     isValidZoomPercent,
     parseNotifyCategories,
-    parseSpaceIds
+    parseSpaceIds,
+    readDesktopNotificationMode
 } from './types/plugin-settings.intf'
 import type { PluginSettings } from './types/plugin-settings.intf'
 import { KnowiiCommunitySettingTab } from './settings/settings-tab'
@@ -323,7 +324,7 @@ export class KnowiiCommunityPlugin extends Plugin {
     private alertOptions(): AlertOptions {
         return {
             notices: this.settings.showNotices,
-            desktop: this.settings.showDesktopNotifications,
+            desktop: this.settings.desktopNotifications,
             open: (item) => {
                 this.openItem(item)
             },
@@ -949,7 +950,6 @@ export class KnowiiCommunityPlugin extends Plugin {
             for (const key of [
                 'notificationsEnabled',
                 'showNotices',
-                'showDesktopNotifications',
                 'showStatusBarBadge',
                 'showRibbonBadge'
             ] as const) {
@@ -959,6 +959,13 @@ export class KnowiiCommunityPlugin extends Plugin {
                 } else {
                     needToSaveSettings = true
                 }
+            }
+            const desktop = readDesktopNotificationMode(
+                data as { desktopNotifications?: unknown; showDesktopNotifications?: unknown }
+            )
+            draft.desktopNotifications = desktop.mode
+            if (desktop.migrated) {
+                needToSaveSettings = true
             }
             if (isCheckInterval(data.checkIntervalSeconds)) {
                 draft.checkIntervalSeconds = data.checkIntervalSeconds
