@@ -94,12 +94,14 @@ export class ActivityWatcher {
         return this.running
     }
 
-    start(): void {
+    /** Start checking (first check shortly). Returns false when already running. */
+    start(): boolean {
         if (this.running) {
-            return
+            return false
         }
         this.running = true
         this.schedule(STARTUP_DELAY_MS)
+        return true
     }
 
     stop(): void {

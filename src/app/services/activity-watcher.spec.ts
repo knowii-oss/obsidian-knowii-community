@@ -423,3 +423,29 @@ describe('markAllRead failures', () => {
         expect(transport.calls).toContain('PATCH /internal_api/chat_threads/mark_all_as_read')
     })
 })
+
+describe('start', () => {
+    test('starts once; a second start reports it is already running', () => {
+        const watcher = new ActivityWatcher(clientFor(), host())
+        const timers: unknown[] = []
+        const g = globalThis as unknown as { window?: unknown }
+        const hadWindow = 'window' in g
+        const previous = g.window
+        g.window = {
+            setTimeout: (fn: unknown) => timers.push(fn),
+            clearTimeout: () => {}
+        }
+        try {
+            expect(watcher.start()).toBe(true)
+            expect(watcher.start()).toBe(false)
+            expect(timers).toHaveLength(1)
+        } finally {
+            watcher.stop()
+            if (hadWindow) {
+                g.window = previous
+            } else {
+                delete g.window
+            }
+        }
+    })
+})

@@ -251,8 +251,11 @@ export class KnowiiCommunityPlugin extends Plugin {
             return
         }
         if (this.settings.notificationsEnabled) {
-            watcher.start()
-            watcher.reschedule()
+            // A fresh start keeps its short first delay; only a running
+            // watcher needs re-arming (the interval may have changed).
+            if (!watcher.start()) {
+                watcher.reschedule()
+            }
         } else {
             watcher.stop()
         }

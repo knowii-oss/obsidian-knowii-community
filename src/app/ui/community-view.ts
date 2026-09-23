@@ -82,6 +82,13 @@ export class KnowiiCommunityView extends ItemView {
 
     private readonly host: CommunityViewHost
     private webview: WebviewElement | null = null
+    /** `loadURL` throws until the webview's first `dom-ready`; before that, set `src`. */
+    private webviewReady = false
+    /**
+     * A page asked for before the pane finished its first load. A render in
+     * that window (the view opening) must land there, not on the last page.
+     */
+    private pendingUrl: string | null = null
     private bodyEl: HTMLElement | null = null
     private backButton: HTMLElement | null = null
     private forwardButton: HTMLElement | null = null
@@ -130,6 +137,9 @@ export class KnowiiCommunityView extends ItemView {
     /** Navigate the hosted community to a path such as `/feed`. */
     navigateTo(path: string): void {
         const url = buildCommunityUrl(this.host.getSettings().communityUrl, path)
+        if (!this.webviewReady) {
+            this.pendingUrl = url
+        }
         this.showPage(url)
     }
 
@@ -187,6 +197,7 @@ export class KnowiiCommunityView extends ItemView {
         const remembered = settings.rememberLastPage ? this.host.loadLastUrl() : null
         const url =
             startUrl ??
+            this.pendingUrl ??
             (isCommunityUrl(settings.communityUrl, remembered)
                 ? (remembered as string)
                 : buildCommunityUrl(settings.communityUrl, '/'))
@@ -195,6 +206,7 @@ export class KnowiiCommunityView extends ItemView {
 
     private teardown(): void {
         this.webview = null
+        this.webviewReady = false
         this.bodyEl = null
         this.backButton = null
         this.forwardButton = null
@@ -403,7 +415,18 @@ export class KnowiiCommunityView extends ItemView {
         this.webview = webview
 
         const zoom = settings.zoomPercent / 100
+        this.webviewReady = false
         webview.addEventListener('dom-ready', () => {
+            this.webviewReady = true
+            // A page asked for while the first one loaded: go there now
+            // (retargeting `src` before the first load is not reliable).
+            const pending = this.pendingUrl
+            this.pendingUrl = null
+            if (pending && this.safeUrl(webview) !== pending) {
+                void webview.loadURL(pending).catch((error: unknown) => {
+                    log('Navigation failed', 'warn', error)
+                })
+            }
             try {
                 webview.setZoomFactor(zoom)
             } catch (error: unknown) {
@@ -433,6 +456,14 @@ export class KnowiiCommunityView extends ItemView {
         })
     }
 
+    private safeUrl(webview: WebviewElement): string | null {
+        try {
+            return webview.getURL()
+        } catch {
+            return null
+        }
+    }
+
     private showPage(url: string): void {
         if (!this.bodyEl) {
             this.render(url)
@@ -442,6 +473,11 @@ export class KnowiiCommunityView extends ItemView {
             // Welcome card or error card is showing: replace it with the page.
             this.host.markWelcomeSeen()
             this.mountWebview(this.bodyEl, url, this.host.getSettings())
+            return
+        }
+        if (!this.webviewReady) {
+            // Still loading its first page: retarget it instead.
+            this.webview.setAttribute('src', url)
             return
         }
         void this.webview.loadURL(url).catch((error: unknown) => {
