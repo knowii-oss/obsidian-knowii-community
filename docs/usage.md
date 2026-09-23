@@ -9,6 +9,8 @@ nav_order: 2
 
 Click the Knowii icon in the ribbon or run the **Open Knowii** command. The first time, a welcome card lets you sign in, or discover Knowii if you are not a member yet. After that, the pane opens straight on the community.
 
+![The Knowii community in an Obsidian pane](images/pane.png)
+
 Sign in once: the pane keeps its own session, separate from your browser, and remembers you across restarts. On your other computers the pane opens already signed in: your session travels with the plugin settings (see [Your session](#your-session)). To sign out, use your profile menu inside Knowii, as you would in a browser.
 
 ## The toolbar
@@ -18,6 +20,10 @@ Above the community, the toolbar offers back, forward and reload, shortcuts to t
 ## Notifications
 
 Once you are signed in, the plugin tells you about new activity as it happens. On desktop it keeps the same live connection Knowii's web app uses, so a new message or notification shows up within seconds; it also checks in the background (every minute by default) as a safety net, and on mobile that background check is what keeps you informed:
+
+![A notice for new activity in Knowii](images/notification.png)
+
+![Unread count on the ribbon icon](images/ribbon-badge.png) ![Unread count in the pane toolbar](images/pane-unread-badge.png)
 
 - **Notices** in Obsidian for each new item: who, what, and a short quote. Click a notice to open the item in the pane. More than three new items at once are folded into one summary notice.
 - **System notifications** for the same items (by default always; choose "only when Obsidian is in the background" or "never" in the settings). Click one to bring Obsidian back on that item.
@@ -58,6 +64,8 @@ These items use the same kinds as the rest (new posts, comments and replies, cha
 
 Things don't have to pile up:
 
+![Mark items as read or archive them](images/read-and-archive.png)
+
 - **Open** an item (Enter or click): it is marked as read.
 - **Move** with the arrows, or Ctrl+J / Ctrl+K without leaving the keyboard's home row.
 - **Mark as read**: the ✓ button on a row, or Ctrl/Cmd+Enter.
@@ -69,6 +77,8 @@ Notifications, conversations and threads are marked as read on Knowii itself, an
 ## What's new
 
 The "what's new" list shows your recent community activity, newest first: conversations, threads and notifications. What you have not read yet is in bold with a pink dot, like unread mail; what you have read stays in the list, quieter. Type to filter; type `is:unread` to keep unread items only. Enter opens the item in the pane.
+
+![The What's new list: recent activity, unread in bold](images/whats-new.png)
 
 Open it from:
 
@@ -82,6 +92,8 @@ Open it from:
 ## Save posts and threads as notes
 
 Keep what matters out of the stream and in your vault:
+
+![The Save as note button in the pane toolbar](images/save-as-note.png)
 
 - in the "what's new" list, the **Save as note** button on a post, a comment or a chat message (or Ctrl/Cmd+S),
 - in the pane, the **Save as note** button of the toolbar while you read a post or a chat message,

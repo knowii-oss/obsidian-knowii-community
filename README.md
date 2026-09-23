@@ -25,6 +25,18 @@ Knowii is a community of practice for knowledge workers who want to organize the
 - **Ribbon right-click**: the latest unread items straight in a menu, plus "Show what's new" and "Check now".
 - **Admin shortcuts**: community admins get an Admin menu in the pane (Dashboard, Audience), the same entries in the ribbon menu, and matching commands.
 
+## Screenshots
+
+![The Knowii community in an Obsidian pane](docs/images/pane.png)
+
+![The What's new list: recent activity, unread in bold](docs/images/whats-new.png)
+
+![Mark items as read or archive them](docs/images/read-and-archive.png)
+
+![Save any post or thread as a note](docs/images/save-as-note.png)
+
+![A notice for new activity](docs/images/notification.png)
+
 ## Getting started
 
 1. Install the plugin from the community plugin directory ([Knowii Community](https://community.obsidian.md/plugins/knowii-community)) and enable it. It also ships with the Obsidian Starter Kit.

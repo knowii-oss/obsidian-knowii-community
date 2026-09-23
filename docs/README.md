@@ -8,6 +8,8 @@ permalink: /
 
 Take part in the [Knowii community](https://www.store.dsebastien.net/product/knowii-community/) without leaving your vault. The plugin opens the community in a pane inside Obsidian (feed, spaces, questions, direct messages and events, right next to your notes) and tells you when something happens there.
 
+![The Knowii community in an Obsidian pane](images/pane.png)
+
 ## Key features
 
 - The whole community in a pane, as a main tab or docked in a sidebar
