@@ -15,6 +15,7 @@ export interface ActivityMenuHandlers {
     openPath(path: string): void
     markAllRead(): void
     archiveRead(): void
+    showEvents(): void
 }
 
 /** One menu line for an item: who, then what, bounded. */
@@ -87,6 +88,14 @@ export function fillActivityMenu(
             .setIcon('archive')
             .onClick(() => {
                 handlers.archiveRead()
+            })
+    )
+    menu.addItem((entry) =>
+        entry
+            .setTitle('Upcoming events')
+            .setIcon('calendar')
+            .onClick(() => {
+                handlers.showEvents()
             })
     )
     menu.addItem((entry) =>

@@ -19,7 +19,9 @@ Take part in the [Knowii community](https://www.store.dsebastien.net/product/kno
 - Notifications for new messages, replies, mentions, posts, comments and more: notices in Obsidian and system notifications, each kind switchable
 - Watches every space you belong to, not only what Knowii notifies you about
 - Unread counts in the status bar and on the ribbon icon
-- A "what's new" inbox: unread in bold, searchable, mark as read and archive (on Knowii too)
+- A "what's new" inbox: unread in bold, searchable, mark as read and archive (on Knowii too), keyboard triage
+- Save any post or chat thread as a note; ask the community from a selection or a note; reply to direct messages without opening Knowii
+- Upcoming events, with a reminder before those you attend
 
 ## Quick start
 

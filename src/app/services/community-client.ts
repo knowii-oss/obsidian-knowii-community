@@ -28,6 +28,21 @@ import type {
     WriteMethod
 } from './community-transport'
 import type { ActivityRef } from '../domain/community-activity'
+import type { CommunityProvider, RealtimeEndpoint } from '../domain/community-provider'
+import type {
+    CommunityEvent,
+    CommunityTarget,
+    FullPost,
+    FullThread
+} from '../domain/community-content'
+import {
+    parseComments,
+    parseEvents,
+    parseFullPost,
+    parseSavedMessage,
+    upcomingEvents
+} from '../domain/community-content'
+import { hasText, textToTiptap } from '../domain/rich-text'
 import type { ChatParticipant, WatchableSpace } from '../domain/community-watch'
 import {
     feedItems,
@@ -98,7 +113,11 @@ export interface CommunityClientHost {
  * (the ones its web app uses), as the signed-in member. Read-only: it never
  * marks anything as read.
  */
-export class CommunityClient {
+/**
+ * The Circle provider: knowii.net as the community's web app sees it. The
+ * rest of the plugin only knows the `CommunityProvider` contract.
+ */
+export class CommunityClient implements CommunityProvider {
     /** Space names and slugs barely change; one lookup per space per session. */
     private readonly spaces = new Map<number, Space | null>()
     /** Admin role per member id; looked up once per member per session. */
@@ -149,6 +168,244 @@ export class CommunityClient {
      */
     knownSpaces(): readonly WatchableSpace[] {
         return (this.spacesCache?.spaces ?? []).filter((space) => space.isMember)
+    }
+
+    // -----------------------------------------------------------------------
+    // Content: posts, threads, events, posting, messaging
+    // -----------------------------------------------------------------------
+
+    async fetchPost(target: Extract<CommunityTarget, { kind: 'post' }>): Promise<FullPost> {
+        const space = await this.spaceBySlug(target.spaceSlug)
+        const post = parseFullPost(
+            (
+                await this.read(
+                    `/internal_api/spaces/${space.id}/posts/${encodeURIComponent(target.postSlug)}`
+                )
+            ).json
+        )
+        if (!post) {
+            throw new Error('This post could not be read')
+        }
+        const comments = parseComments(
+            (await this.read(`/internal_api/posts/${post.id}/comments?per_page=100&page=1`)).json
+        )
+        return {
+            ...post,
+            spaceName: post.spaceName ?? space.name,
+            spaceSlug: post.spaceSlug ?? space.slug,
+            // Oldest first reads like the conversation it was.
+            comments: [...comments].sort((a, b) => a.at - b.at)
+        }
+    }
+
+    async fetchThread(target: Extract<CommunityTarget, { kind: 'message' }>): Promise<FullThread> {
+        const space = await this.spaceBySlug(target.spaceSlug)
+        const uuid = await this.spaceRoom(space.id)
+        if (!uuid) {
+            throw new Error('This space has no chat')
+        }
+        const messageJson = (
+            await this.read(
+                `/internal_api/chat_rooms/${encodeURIComponent(uuid)}/messages/${target.messageId}`
+            )
+        ).json
+        const message = messageJson as Record<string, unknown> | null
+        // A reply belongs to its parent's thread: save the whole thread.
+        const parentId =
+            typeof message?.['parent_message_id'] === 'number' ? message['parent_message_id'] : null
+        const rootJson =
+            null === parentId
+                ? messageJson
+                : (
+                      await this.read(
+                          `/internal_api/chat_rooms/${encodeURIComponent(uuid)}/messages/${parentId}`
+                      )
+                  ).json
+        const root = rootJson as Record<string, unknown> | null
+        // The whole thread: the messages whose parent is the root (the thread
+        // endpoint only previews the last few replies).
+        const rootId = typeof root?.['id'] === 'number' ? root['id'] : null
+        const repliesJson =
+            null === rootId
+                ? null
+                : ((await this.optional(
+                      async () =>
+                          (
+                              await this.read(
+                                  `/internal_api/chat_rooms/${encodeURIComponent(uuid)}/messages?parent_message_id=${rootId}&previous_per_page=100&next_per_page=0`
+                              )
+                          ).json as Record<string, unknown>
+                  )) ?? null)
+        const replyRecords = Array.isArray(repliesJson?.['records'])
+            ? (repliesJson['records'] as unknown[])
+            : []
+        const ids = [root, ...replyRecords]
+            .map((record) =>
+                record && 'object' === typeof record
+                    ? (record as Record<string, unknown>)['chat_room_participant_id']
+                    : null
+            )
+            .filter((id): id is number => 'number' === typeof id)
+        const names = new Map<number, string>()
+        for (const participant of (await this.roomParticipantsFor(uuid, ids)).values()) {
+            names.set(participant.id, participant.name)
+        }
+        const saved = parseSavedMessage(rootJson, names)
+        if (!saved) {
+            throw new Error('This message could not be read')
+        }
+        return {
+            spaceName: space.name,
+            spaceSlug: space.slug,
+            root: saved,
+            replies: replyRecords
+                .map((record) => parseSavedMessage(record, names))
+                .filter((reply): reply is NonNullable<typeof reply> => null !== reply)
+        }
+    }
+
+    async upcomingEvents(): Promise<{ event: CommunityEvent; path: string }[]> {
+        const now = new Date()
+        const until = new Date(now.getTime() + 90 * 24 * 60 * 60 * 1000)
+        const query = [
+            'page=1',
+            'per_page=100',
+            `filter_date[start_date]=${encodeURIComponent(now.toDateString())}`,
+            `filter_date[end_date]=${encodeURIComponent(until.toDateString())}`,
+            'calendar_view=true'
+        ].join('&')
+        const events = upcomingEvents(
+            parseEvents((await this.read(`/internal_api/events/community_events?${query}`)).json),
+            now.getTime()
+        )
+        const spaces = this.spacesCache?.spaces ?? []
+        return events.map((event) => {
+            const space = spaces.find((candidate) => candidate.id === event.spaceId)
+            return { event, path: space ? `/c/${space.slug}/${event.slug}` : '/events' }
+        })
+    }
+
+    realtime(member: CommunityMember): RealtimeEndpoint {
+        return {
+            path: '/cable',
+            protocol: 'actioncable-v1-json',
+            subscriptions: [
+                { channel: 'NotificationChannel', community_member_id: member.id },
+                { channel: 'ChatRoomChannel', contact_id: member.id }
+            ].map((identifier) =>
+                JSON.stringify({ command: 'subscribe', identifier: JSON.stringify(identifier) })
+            )
+        }
+    }
+
+    async createPost(spaceId: number, title: string, text: string): Promise<string> {
+        const doc = textToTiptap(text)
+        if ('' === title.trim() || !hasText(doc)) {
+            throw new Error('A post needs a title and some text')
+        }
+        const response = await this.write(
+            `/internal_api/spaces/${spaceId}/posts`,
+            'POST',
+            {
+                post: {
+                    space_id: spaceId,
+                    name: title.trim(),
+                    status: 'published',
+                    tiptap_body: { body: doc }
+                }
+            },
+            { creates: true }
+        )
+        const json = response as Record<string, unknown> | null
+        const post = (json && 'object' === typeof json['post'] ? json['post'] : json) as Record<
+            string,
+            unknown
+        > | null
+        const slug = 'string' === typeof post?.['slug'] ? post['slug'] : null
+        const space = (this.spacesCache?.spaces ?? []).find((candidate) => candidate.id === spaceId)
+        return slug && space ? `/c/${space.slug}/${slug}` : space ? `/c/${space.slug}` : '/feed'
+    }
+
+    async sendMessage(roomUuid: string, text: string): Promise<void> {
+        const doc = textToTiptap(text)
+        // Never send an empty message: the community accepts it (and shows it).
+        if (!hasText(doc)) {
+            throw new Error('The message is empty')
+        }
+        const room = (await this.read(`/internal_api/chat_rooms/${encodeURIComponent(roomUuid)}`))
+            .json as Record<string, unknown> | null
+        const chatRoom = (
+            room && 'object' === typeof room['chat_room'] ? room['chat_room'] : room
+        ) as Record<string, unknown> | null
+        const current =
+            chatRoom && 'object' === typeof chatRoom['current_participant']
+                ? (chatRoom['current_participant'] as Record<string, unknown>)
+                : null
+        const participantId = 'number' === typeof current?.['id'] ? current['id'] : null
+        if (null === participantId) {
+            throw new Error('You are not part of this conversation')
+        }
+        await this.write(
+            `/internal_api/chat_rooms/${encodeURIComponent(roomUuid)}/messages`,
+            'POST',
+            {
+                chat_room_message: {
+                    chat_room_participant_id: participantId,
+                    rich_text_body: { body: doc }
+                }
+            },
+            { creates: true }
+        )
+    }
+
+    /** A space by its slug, from the (refreshed if needed) spaces list. */
+    private async spaceBySlug(slug: string): Promise<WatchableSpace> {
+        const find = (): WatchableSpace | undefined =>
+            this.spacesCache?.spaces.find((space) => space.slug === slug)
+        let space = find()
+        if (!space) {
+            this.spacesCache = null
+            await this.watchableSpaces((path) => this.read(path))
+            space = find()
+        }
+        if (!space) {
+            throw new Error('This space is not available to you')
+        }
+        return space
+    }
+
+    /** A space's chat room uuid, looked up once. */
+    private async spaceRoom(spaceId: number): Promise<string | null> {
+        if (!this.spaceRooms.has(spaceId)) {
+            const uuid = await this.optional(async () =>
+                parseSpaceChatRoomUuid((await this.read(`/internal_api/spaces/${spaceId}`)).json)
+            )
+            this.spaceRooms.set(spaceId, uuid)
+        }
+        return this.spaceRooms.get(spaceId) ?? null
+    }
+
+    private roomParticipantsFor(
+        uuid: string,
+        ids: readonly number[]
+    ): Promise<Map<number, ChatParticipant>> {
+        return this.roomParticipants((path) => this.read(path), uuid, ids)
+    }
+
+    /** One GET through the first transport that manages it, signed-in or failing. */
+    private async read(path: string): Promise<TransportResponse> {
+        let lastError: unknown = new Error('No way to reach the community on this device')
+        for (const transport of this.host.transports()) {
+            try {
+                return await this.get(transport, path)
+            } catch (error: unknown) {
+                if (error instanceof SignedOutError) {
+                    throw new Error('Sign in to Knowii first')
+                }
+                lastError = error
+            }
+        }
+        throw lastError
     }
 
     // -----------------------------------------------------------------------
@@ -214,11 +471,23 @@ export class CommunityClient {
     }
 
     /** One write, through the first transport that manages to send it. */
-    private async write(path: string, method: WriteMethod): Promise<void> {
+    /**
+     * One write through the first transport that manages it; returns the
+     * community's answer. Creating content (a post, a message) is never
+     * retried on another transport: the first one may have got through
+     * before failing, and a retry would publish it twice.
+     */
+    private async write(
+        path: string,
+        method: WriteMethod,
+        body?: unknown,
+        options: { creates?: boolean } = {}
+    ): Promise<unknown> {
         let lastError: unknown = new Error('No way to reach the community on this device')
-        for (const transport of this.host.transports()) {
+        const transports = this.host.transports()
+        for (const transport of options.creates ? transports.slice(0, 1) : transports) {
             try {
-                const response = await transport.send(this.host.baseUrl(), path, method)
+                const response = await transport.send(this.host.baseUrl(), path, method, body)
                 if (response.setCookies.length > 0) {
                     this.host.onSetCookies(response.setCookies)
                 }
@@ -228,7 +497,7 @@ export class CommunityClient {
                 if (response.status >= 400) {
                     throw new Error(`Knowii refused (${response.status})`)
                 }
-                return
+                return response.json
             } catch (error: unknown) {
                 lastError = error
             }

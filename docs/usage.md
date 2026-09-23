@@ -9,7 +9,7 @@ nav_order: 2
 
 Click the Knowii icon in the ribbon or run the **Open Knowii** command. The first time, a welcome card lets you sign in, or discover Knowii if you are not a member yet. After that, the pane opens straight on the community.
 
-Sign in once: the pane keeps its own session, separate from your browser, and remembers you across restarts. To sign out, use your profile menu inside Knowii, as you would in a browser.
+Sign in once: the pane keeps its own session, separate from your browser, and remembers you across restarts. On your other computers the pane opens already signed in: your session travels with the plugin settings (see [Your session](#your-session)). To sign out, use your profile menu inside Knowii, as you would in a browser.
 
 ## The toolbar
 
@@ -17,7 +17,7 @@ Above the community, the toolbar offers back, forward and reload, shortcuts to t
 
 ## Notifications
 
-Once you are signed in, the plugin checks Knowii in the background (every minute by default) and tells you about new activity:
+Once you are signed in, the plugin tells you about new activity as it happens. On desktop it keeps the same live connection Knowii's web app uses, so a new message or notification shows up within seconds; it also checks in the background (every minute by default) as a safety net, and on mobile that background check is what keeps you informed:
 
 - **Notices** in Obsidian for each new item: who, what, and a short quote. Click a notice to open the item in the pane. More than three new items at once are folded into one summary notice.
 - **System notifications** for the same items (by default always; choose "only when Obsidian is in the background" or "never" in the settings). Click one to bring Obsidian back on that item.
@@ -59,8 +59,9 @@ These items use the same kinds as the rest (new posts, comments and replies, cha
 Things don't have to pile up:
 
 - **Open** an item (Enter or click): it is marked as read.
+- **Move** with the arrows, or Ctrl+J / Ctrl+K without leaving the keyboard's home row.
 - **Mark as read**: the ✓ button on a row, or Ctrl/Cmd+Enter.
-- **Archive**: the archive button on a row, or Alt+Enter. The item leaves the list; it only comes back if something new happens on it (a new message in that conversation, a new update on that notification).
+- **Archive**: the archive button on a row, Ctrl+E or Alt+Enter. The item leaves the list; it only comes back if something new happens on it (a new message in that conversation, a new update on that notification).
 - **Mark all as read** and **Archive read**, at the top of the list, in the ribbon's right-click menu, and as commands. Marking everything as read asks first.
 
 Notifications, conversations and threads are marked as read on Knowii itself, and archiving a notification archives it on Knowii too, so the web app and the plugin agree. Posts, comments and chat messages found by watching the whole community have no read state on Knowii; the plugin keeps theirs on this device (reading a chat message also marks its chat as read on Knowii).
@@ -77,6 +78,33 @@ Open it from:
 - any notice or system notification about unread items ("You have N unread items", "N more new").
 
 **Right-click the Knowii ribbon icon** for a quicker look: the latest unread items straight in the menu (click one to open it), then "Show what's new" and "Check now".
+
+## Save posts and threads as notes
+
+Keep what matters out of the stream and in your vault:
+
+- in the "what's new" list, the **Save as note** button on a post, a comment or a chat message (or Ctrl/Cmd+S),
+- in the pane, the **Save as note** button of the toolbar while you read a post or a chat message,
+- the command **Save the current Knowii page as a note**.
+
+A post is saved with its comments, a chat message with its whole thread. The note goes to the folder set in the settings (**Knowii** by default), with the author, the space, the dates and a link back to Knowii in its properties, and opens right away. Saving the same post again opens the existing note instead of overwriting it, so your own additions are safe.
+
+## Ask the community
+
+Stuck on something in your vault? Select the text you want to discuss, right-click, and choose **Ask the Knowii community** (or run **Ask the community** from the command palette, or right-click a note in the file explorer). A window opens with your selection (or the whole note) as the question and the note's name as the title; pick the space (**Ask the Community** first), adjust, and post. The post is published right away, as you, and opens in the pane.
+
+## Reply without opening Knowii
+
+Answer a direct message where you see it:
+
+- the **Reply** button on a direct-message notice,
+- the **Reply** button on a direct message in the "what's new" list (or Ctrl/Cmd+R).
+
+Type, then **Send** (or Ctrl/Cmd+Enter). The conversation is marked as read.
+
+## Events
+
+**Show upcoming Knowii events** (also in the ribbon's right-click menu) lists the events ahead, soonest first; the ones you said you would attend are highlighted. Enter opens one in the pane. For those you attend, the plugin reminds you 15 minutes before they start, with a notice and a system notification (switch it off with **Events** under **Notify me about**).
 
 ## Admin shortcuts
 
@@ -100,23 +128,26 @@ Treat that file like a password: anyone with a copy can use your Knowii account.
 
 ## Commands
 
-| Command                           | What it does                                                         |
-| --------------------------------- | -------------------------------------------------------------------- |
-| Open Knowii                       | Opens or reveals the pane                                            |
-| Open Knowii: home                 | Opens the pane on the community home page                            |
-| Open Knowii: feed                 | Opens the pane on the feed                                           |
-| Open Knowii: messages             | Opens the pane on your direct messages                               |
-| Open Knowii: notifications        | Opens the pane on your notifications                                 |
-| Open Knowii: events               | Opens the pane on the events                                         |
-| Open Knowii: members              | Opens the pane on the member directory                               |
-| Show what's new in Knowii         | Lists everything unread; Enter opens an item in the pane             |
-| Check Knowii for new activity now | Checks right away and shows the unread counts                        |
-| Mark everything in Knowii as read | Notifications, conversations and threads, on Knowii too (asks first) |
-| Archive what is read in Knowii    | Clears everything read from the list                                 |
-| Open Knowii admin: dashboard      | Community dashboard (admins only)                                    |
-| Open Knowii admin: audience       | Member management (admins only)                                      |
-| Reload the Knowii pane            | Reloads the community (only when the pane is open)                   |
-| Open Knowii in your browser       | Opens the current page, or the community home, in your browser       |
+| Command                                | What it does                                                                     |
+| -------------------------------------- | -------------------------------------------------------------------------------- |
+| Open Knowii                            | Opens or reveals the pane                                                        |
+| Open Knowii: home                      | Opens the pane on the community home page                                        |
+| Open Knowii: feed                      | Opens the pane on the feed                                                       |
+| Open Knowii: messages                  | Opens the pane on your direct messages                                           |
+| Open Knowii: notifications             | Opens the pane on your notifications                                             |
+| Open Knowii: events                    | Opens the pane on the events                                                     |
+| Open Knowii: members                   | Opens the pane on the member directory                                           |
+| Show what's new in Knowii              | Lists everything unread; Enter opens an item in the pane                         |
+| Check Knowii for new activity now      | Checks right away and shows the unread counts                                    |
+| Save the current Knowii page as a note | Saves the post (with comments) or chat message (with its thread) you are reading |
+| Ask the community                      | Posts your selection or note as a question in a space you pick                   |
+| Show upcoming Knowii events            | Lists the events ahead; Enter opens one                                          |
+| Mark everything in Knowii as read      | Notifications, conversations and threads, on Knowii too (asks first)             |
+| Archive what is read in Knowii         | Clears everything read from the list                                             |
+| Open Knowii admin: dashboard           | Community dashboard (admins only)                                                |
+| Open Knowii admin: audience            | Member management (admins only)                                                  |
+| Reload the Knowii pane                 | Reloads the community (only when the pane is open)                               |
+| Open Knowii in your browser            | Opens the current page, or the community home, in your browser                   |
 
 ## If you don't see system notifications
 

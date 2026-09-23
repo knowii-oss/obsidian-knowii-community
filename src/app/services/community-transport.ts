@@ -41,8 +41,13 @@ export interface CommunityTransport {
     readonly id: TransportId
     /** GET `path` (community-relative) as the signed-in member. */
     get(baseUrl: string, path: string): Promise<TransportResponse>
-    /** A state-changing request (mark as read, archive), with the CSRF token. */
-    send(baseUrl: string, path: string, method: WriteMethod): Promise<TransportResponse>
+    /** A state-changing request (post, message, mark as read…), with the CSRF token. */
+    send(
+        baseUrl: string,
+        path: string,
+        method: WriteMethod,
+        body?: unknown
+    ): Promise<TransportResponse>
     dispose(): void
 }
 
@@ -133,7 +138,12 @@ export class ElectronSessionTransport implements CommunityTransport {
         return { status: response.status, json: parseBody(text), setCookies: [] }
     }
 
-    async send(baseUrl: string, path: string, method: WriteMethod): Promise<TransportResponse> {
+    async send(
+        baseUrl: string,
+        path: string,
+        method: WriteMethod,
+        body?: unknown
+    ): Promise<TransportResponse> {
         const [csrf] = await this.session.cookies.get({
             url: joinUrl(baseUrl, '/'),
             name: CSRF_COOKIE
@@ -144,7 +154,8 @@ export class ElectronSessionTransport implements CommunityTransport {
                 ...JSON_HEADERS,
                 'content-type': 'application/json',
                 ...(csrf ? { 'x-csrf-token': decodeCookieValue(csrf.value) } : {})
-            }
+            },
+            ...(undefined === body ? {} : { body: JSON.stringify(body) })
         })
         const text = await response.text()
         return { status: response.status, json: parseBody(text), setCookies: [] }
@@ -233,7 +244,12 @@ export class HiddenWebviewTransport implements CommunityTransport {
         }
     }
 
-    async send(baseUrl: string, path: string, method: WriteMethod): Promise<TransportResponse> {
+    async send(
+        baseUrl: string,
+        path: string,
+        method: WriteMethod,
+        body?: unknown
+    ): Promise<TransportResponse> {
         const webview = await this.ensure(baseUrl)
         // Same token lookup as the community's web app: the csrf_token cookie.
         const script = `(() => {
@@ -241,7 +257,7 @@ export class HiddenWebviewTransport implements CommunityTransport {
             const token = pair ? decodeURIComponent(pair.slice(${CSRF_COOKIE.length + 1})) : ''
             const headers = { accept: 'application/json', 'content-type': 'application/json' }
             if (token) headers['x-csrf-token'] = token
-            return fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, credentials: 'include', headers })
+            return fetch(${JSON.stringify(path)}, { method: ${JSON.stringify(method)}, credentials: 'include', headers${undefined === body ? '' : `, body: ${JSON.stringify(JSON.stringify(body))}`} })
                 .then((response) => response.text().then((text) => ({ status: response.status, text })))
         })()`
         const result = (await webview.executeJavaScript(script)) as {
@@ -341,7 +357,12 @@ export class StoredCookiesTransport implements CommunityTransport {
         return toTransportResponse(response)
     }
 
-    async send(baseUrl: string, path: string, method: WriteMethod): Promise<TransportResponse> {
+    async send(
+        baseUrl: string,
+        path: string,
+        method: WriteMethod,
+        body?: unknown
+    ): Promise<TransportResponse> {
         const cookies = this.getCookies()
         const host = new URL(baseUrl).host
         const header = cookies ? cookieHeader(cookies, host) : ''
@@ -358,6 +379,7 @@ export class StoredCookiesTransport implements CommunityTransport {
                 cookie: header,
                 ...(csrf ? { 'x-csrf-token': decodeCookieValue(csrf.value) } : {})
             },
+            ...(undefined === body ? {} : { body: JSON.stringify(body) }),
             throw: false
         })
         return toTransportResponse(response)

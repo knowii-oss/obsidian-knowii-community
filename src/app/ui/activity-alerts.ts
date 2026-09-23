@@ -24,6 +24,9 @@ export interface AlertOptions {
     readonly open: (item: ActivityItem) => void
     /** Show the full list of what's new. */
     readonly openList: () => void
+    /** Answer a conversation without opening it (direct messages). */
+    readonly reply?: (item: ActivityItem) => void
+    readonly canReply?: (item: ActivityItem) => boolean
 }
 
 /** Tells the member about new activity: a few items, then a summary. */
@@ -95,7 +98,21 @@ function showItemNotice(item: ActivityItem, options: AlertOptions): void {
             body.createDiv({ cls: `${CLS}-notice-excerpt`, text: item.excerpt })
         }
     })
-    clickable(new Notice(fragment, NOTICE_DURATION_MS), () => options.open(item))
+    const notice = new Notice(fragment, NOTICE_DURATION_MS)
+    const reply = options.reply
+    if (reply && options.canReply?.(item)) {
+        const button = notice.messageEl.createEl('button', {
+            cls: `${CLS}-notice-reply`,
+            text: 'Reply'
+        })
+        button.addEventListener('click', (event) => {
+            // Reply, not open: keep the click from reaching the notice.
+            event.stopPropagation()
+            notice.hide()
+            reply(item)
+        })
+    }
+    clickable(notice, () => options.open(item))
 }
 
 function showSummaryNotice(text: string, onClick?: () => void): void {

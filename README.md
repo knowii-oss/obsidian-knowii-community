@@ -17,6 +17,11 @@ Knowii is a community of practice for knowledge workers who want to organize the
 - **What's new list**: recent activity, newest first, unread in bold (Gmail style), searchable (`is:unread` for unread only). Open it from the command palette, the status bar, the pane's toolbar or any "unread" notice. Enter opens the item.
 - **The whole community, not only your notifications**: new posts, comments and chat messages in every space you belong to (switch any space off). Your own are left out.
 - **Mark as read, archive**: per item, or all at once. Notifications, conversations and threads are marked read (and notifications archived) on Knowii itself, so the web app agrees.
+- **Save to your vault**: any post (with its comments) or chat message (with its thread) becomes a note in one click.
+- **Ask the community** from a selection or a whole note: pick a space, post, done.
+- **Reply to direct messages** from the notice or the list, without opening Knowii.
+- **Events**: the upcoming ones in a list, and a reminder 15 minutes before those you attend.
+- **Instant**: on desktop, new messages and notifications arrive within seconds through Knowii's own live connection.
 - **Ribbon right-click**: the latest unread items straight in a menu, plus "Show what's new" and "Check now".
 - **Admin shortcuts**: community admins get an Admin menu in the pane (Dashboard, Audience), the same entries in the ribbon menu, and matching commands.
 

@@ -19,3 +19,14 @@ The plugin hosts the community in a pane, and watches it in the background for n
 - `src/app/whats-new.ts` and `src/app/ui/`: the shared "What's new" tab and support links from the plugin template.
 
 Per-device memory (last page, welcome seen, already-announced item keys) goes through `App.loadLocalStorage` / `saveLocalStorage`, never through `data.json`, so it does not sync with the vault. The session is the exception by design: it lives in `data.json` so it syncs. Session writes skip the UI refresh, and the pane is only re-rendered when a pane setting changes (re-rendering reloads the community). `onExternalSettingsChange` picks up a session synced from another device.
+
+## Provider layer, content and live updates (1.3)
+
+- `src/app/domain/community-provider.ts`: `CommunityProvider`, the one contract the plugin uses (activity, spaces, posts, threads, events, live updates, read/archive, posting, messaging). `CommunityClient` is the Circle implementation; a future platform plugs in by implementing the interface.
+- `src/app/domain/rich-text.ts`: TipTap JSON to Markdown (notes) and plain text to TipTap (posts, messages).
+- `src/app/domain/community-content.ts`: community paths (`/c/<space>/<post>`, `?message_id=`), full posts and comments, chat messages and threads, events, and the Markdown notes they become.
+- Content endpoints: `GET spaces/:id/posts/:slug`, `GET posts/:id/comments`, `GET chat_rooms/:uuid/messages/:id`, `GET chat_rooms/:uuid/messages?parent_message_id=:id&previous_per_page=100&next_per_page=0` (a whole thread), `GET events/community_events`, `POST spaces/:id/posts` with `{ post: { space_id, name, status, tiptap_body: { body } } }`, `POST chat_rooms/:uuid/messages` with `{ chat_room_message: { chat_room_participant_id, rich_text_body: { body } } }`.
+- `src/app/services/realtime-link.ts`: a hidden webview on the pane's partition, parked on `/robots.txt`, opens the web app's Action Cable socket (`/cable`, `actioncable-v1-json`), subscribes to `NotificationChannel` (`community_member_id`) and `ChatRoomChannel` (`contact_id`), and reports through console lines; any event triggers a check. Desktop only; polling stays as the safety net.
+- `src/app/services/event-reminders.ts`: refreshes events every 30 minutes, arms a timer 15 minutes before each attended event within 24 hours, reminds once per device.
+- `src/app/services/note-saver.ts`: writes saved content to the notes folder; never overwrites an existing note.
+- Startup: the stored session is written into the pane's cookie jar (when it has none) before the view is registered, so the pane opens signed in.

@@ -76,6 +76,8 @@ export interface PluginSettings {
     watchWholeCommunity: boolean
     /** Spaces left out of the whole-community watch. */
     mutedSpaceIds: number[]
+    /** Vault folder for posts and threads saved as notes. */
+    notesFolder: string
 
     /**
      * The member's community session (cookies), copied from the desktop
@@ -115,6 +117,7 @@ export const DEFAULT_SETTINGS: PluginSettings = {
     notifyCategories: DEFAULT_NOTIFY_CATEGORIES,
     watchWholeCommunity: true,
     mutedSpaceIds: [],
+    notesFolder: 'Knowii',
     session: null
 }
 

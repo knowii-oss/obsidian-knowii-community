@@ -212,6 +212,25 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
             },
             {
                 type: 'group',
+                heading: 'Saving to your vault',
+                items: [
+                    {
+                        name: 'Folder for saved posts',
+                        desc: 'Posts and chat threads you save as notes go to this folder.',
+                        control: {
+                            type: 'text',
+                            key: 'notesFolder',
+                            placeholder: 'Knowii',
+                            validate: (value) =>
+                                '' !== value.trim() && !value.includes('..')
+                                    ? undefined
+                                    : 'Enter a folder of your vault, such as Knowii.'
+                        }
+                    }
+                ]
+            },
+            {
+                type: 'group',
                 heading: 'Advanced',
                 items: [
                     {
@@ -325,6 +344,8 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                 return String(this.plugin.settings.checkIntervalSeconds)
             case 'desktopNotifications':
                 return this.plugin.settings.desktopNotifications
+            case 'notesFolder':
+                return this.plugin.settings.notesFolder
             case 'paneLocation':
                 return this.plugin.settings.paneLocation
             case 'zoomPercent':
@@ -380,6 +401,17 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
             return
         }
         switch (key) {
+            case 'notesFolder': {
+                const folder =
+                    'string' === typeof value ? value.trim().replace(/^\/+|\/+$/g, '') : ''
+                if ('' === folder || folder.includes('..')) {
+                    throw new Error(`Setting "${key}" expects a vault folder.`)
+                }
+                await this.plugin.updateSettings((draft) => {
+                    draft.notesFolder = folder
+                })
+                return
+            }
             case 'desktopNotifications':
                 if (!isDesktopNotificationMode(value)) {
                     throw new Error(`Setting "${key}" expects always, background or off.`)

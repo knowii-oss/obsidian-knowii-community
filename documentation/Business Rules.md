@@ -20,6 +20,18 @@ Checks only read (GET); nothing is marked as read by the plugin. The first check
 
 Anything that fails (no network, unsupported platform) ends in a card that offers the browser as a way out.
 
+## Content is never published twice, never empty
+
+Creating a post or sending a message goes through one transport only: a failure after the request left may mean it got through, and a retry would publish it twice. Empty messages are refused before sending (the community accepts and shows them).
+
+## Saving never overwrites
+
+Saving a post or thread whose note already exists opens the existing note: it may carry the member's own additions.
+
+## Tests never reach other members
+
+Probing or testing writes (posts, messages) uses drafts or rooms nobody else is in. On 2026-09-23 an empty test message was accepted by the community in a real conversation and had to be deleted.
+
 ## Documentation Guidelines
 
 When a new business rule is mentioned:

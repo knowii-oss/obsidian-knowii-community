@@ -1,4 +1,4 @@
-import { Menu, Notice, Platform, Plugin, addIcon } from 'obsidian'
+import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, addIcon } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
 import {
     DEFAULT_SETTINGS,
@@ -50,6 +50,18 @@ import { StatusBarBadge, renderRibbonBadge } from './ui/activity-indicators'
 import { ActivityModal } from './ui/activity-modal'
 import { fillActivityMenu } from './ui/activity-menu'
 import { confirmAction } from './ui/confirm-modal'
+import { AskModal, EventsModal, ReplyModal } from './ui/compose-modals'
+import type { CommunityProvider } from './domain/community-provider'
+import type { CommunityEvent } from './domain/community-content'
+import {
+    parseCommunityTarget,
+    renderPostNote,
+    renderThreadNote,
+    threadTitle
+} from './domain/community-content'
+import { RealtimeLink } from './services/realtime-link'
+import { EventReminders } from './services/event-reminders'
+import { saveNote } from './services/note-saver'
 import { ActivityInbox } from './services/activity-inbox'
 import type { ActivityListController } from './ui/activity-modal'
 import type { WatchableSpace } from './domain/community-watch'
@@ -86,7 +98,10 @@ export class KnowiiCommunityPlugin extends Plugin {
     private webviewTransport: HiddenWebviewTransport | null = null
     private storedTransport: StoredCookiesTransport | null = null
     private watcher: ActivityWatcher | null = null
-    private client: CommunityClient | null = null
+    private client: CommunityProvider | null = null
+    private realtime: RealtimeLink | null = null
+    private reminders: EventReminders | null = null
+    private eventsRefreshedAt = 0
     private settingTab: KnowiiCommunitySettingTab | null = null
     /** Spaces listed in the settings; the tab is rebuilt when this changes. */
     private listedSpaceIds = ''
@@ -104,14 +119,17 @@ export class KnowiiCommunityPlugin extends Plugin {
         await this.loadSettings()
 
         addIcon(KNOWII_ICON_ID, KNOWII_ICON_SVG)
+        this.setupActivity()
+        // The stored session signs the pane in before it can show anything.
+        await this.restoreSessionAtStartup()
         this.registerView(
             COMMUNITY_VIEW_TYPE,
             (leaf) => new KnowiiCommunityView(leaf, this.viewHost)
         )
 
         this.registerCommands()
+        this.registerMenus()
         this.applyRibbonSetting()
-        this.setupActivity()
 
         this.settingTab = new KnowiiCommunitySettingTab(this.app, this)
         this.addSettingTab(this.settingTab)
@@ -163,6 +181,27 @@ export class KnowiiCommunityPlugin extends Plugin {
         })
 
         this.client = client
+        if (Platform.isDesktopApp) {
+            this.realtime = new RealtimeLink({
+                baseUrl: () => this.settings.communityUrl,
+                onActivity: () => {
+                    this.watcher?.checkSoon(1500)
+                },
+                onStatus: (status) => {
+                    log(`Live updates: ${status}`, 'debug')
+                }
+            })
+        }
+        this.reminders = new EventReminders({
+            upcomingEvents: () => client.upcomingEvents(),
+            remind: (event, path) => {
+                this.remindEvent(event, path)
+            },
+            load: (key) => this.app.loadLocalStorage(key) as unknown,
+            save: (key, value) => {
+                this.app.saveLocalStorage(key, value)
+            }
+        })
         this.watcher = new ActivityWatcher(client, {
             decorate: (snapshot) => inbox.merge(snapshot.items, snapshot.unreadRoomUuids),
             intervalMs: () => this.settings.checkIntervalSeconds * 1000,
@@ -181,6 +220,7 @@ export class KnowiiCommunityPlugin extends Plugin {
             onState: (state) => {
                 this.renderActivity(state)
                 this.refreshSpaceSettings()
+                this.followState(state)
             },
             onNewItems: (items, initial) => {
                 this.announce(items, initial)
@@ -207,6 +247,8 @@ export class KnowiiCommunityPlugin extends Plugin {
         this.register(() => {
             this.watcher?.stop()
             this.webviewTransport?.dispose()
+            this.realtime?.dispose()
+            this.reminders?.stop()
         })
         // Catch up as soon as the member comes back or the network returns.
         this.registerDomEvent(window, 'focus', () => {
@@ -223,6 +265,241 @@ export class KnowiiCommunityPlugin extends Plugin {
         this.app.workspace.onLayoutReady(() => {
             this.applyActivitySettings()
         })
+    }
+
+    /** Live updates and event reminders follow the sign-in. */
+    private followState(state: WatchState): void {
+        if ('signed-in' === state.status && state.member && this.client) {
+            const endpoint = this.client.realtime(state.member)
+            if (this.realtime && endpoint && this.settings.notificationsEnabled) {
+                this.realtime.connect(endpoint)
+            }
+            // Events and RSVPs change slowly: every 30 minutes is plenty.
+            if (Date.now() - this.eventsRefreshedAt > 30 * 60 * 1000) {
+                this.eventsRefreshedAt = Date.now()
+                void this.reminders?.refresh().catch((error: unknown) => {
+                    log('Events could not be read', 'warn', error)
+                })
+            }
+        } else if ('signed-out' === state.status) {
+            this.realtime?.dispose()
+            this.reminders?.stop()
+            this.eventsRefreshedAt = 0
+        }
+    }
+
+    /**
+     * Put the stored session in the pane's cookie jar before anything opens,
+     * when this device has none: the pane then opens signed in.
+     */
+    private async restoreSessionAtStartup(): Promise<void> {
+        const electron = this.electronTransport
+        const stored = this.settings.session
+        if (!electron || !stored) {
+            return
+        }
+        try {
+            const jar = await electron.readCookies(this.settings.communityUrl)
+            if (!hasAuthCookie(jar)) {
+                await electron.writeCookies(this.settings.communityUrl, stored.cookies)
+                log('Signed the pane in with the stored session', 'debug')
+            }
+        } catch (error: unknown) {
+            log('Could not restore the stored session', 'warn', error)
+        }
+        this.sessionRestoreAttempted = true
+    }
+
+    /** An event the member attends starts in 15 minutes. */
+    private remindEvent(event: CommunityEvent, path: string): void {
+        if (!this.settings.notificationsEnabled || !this.settings.notifyCategories.events) {
+            return
+        }
+        announceItems(
+            [
+                {
+                    key: `event:${event.id}:${event.startsAt}`,
+                    category: 'events',
+                    title: event.name,
+                    summary: `starts in 15 minutes, at ${new Date(event.startsAt).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })}`,
+                    excerpt: null,
+                    path,
+                    occurredAt: event.startsAt,
+                    unread: true,
+                    notify: true,
+                    ref: { kind: 'local' }
+                }
+            ],
+            this.alertOptions()
+        )
+    }
+
+    // -----------------------------------------------------------------------
+    // Save, ask, reply, events
+    // -----------------------------------------------------------------------
+
+    /** Whether a community path can be saved as a note (a post or a chat message). */
+    canSave(path: string | null): boolean {
+        return null !== path && 'other' !== parseCommunityTarget(path).kind
+    }
+
+    /** Save a post (with its comments) or a chat message (with its thread) as a note, then open it. */
+    async saveAsNote(path: string): Promise<void> {
+        const client = this.client
+        if (!client) {
+            return
+        }
+        const target = parseCommunityTarget(path)
+        if ('other' === target.kind) {
+            new Notice('Knowii: only posts and chat messages can be saved as notes.')
+            return
+        }
+        const saving = new Notice('Knowii: saving…', 0)
+        try {
+            const base = this.settings.communityUrl
+            let title: string
+            let content: string
+            if ('post' === target.kind) {
+                const post = await client.fetchPost(target)
+                const url = buildCommunityUrl(base, `/c/${target.spaceSlug}/${target.postSlug}`)
+                title = post.title
+                content = renderPostNote(post, url, Date.now())
+            } else {
+                const thread = await client.fetchThread(target)
+                const url = buildCommunityUrl(base, path)
+                title = threadTitle(thread)
+                content = renderThreadNote(thread, url, Date.now())
+            }
+            const { file, created } = await saveNote(
+                this.app,
+                this.settings.notesFolder,
+                title,
+                content
+            )
+            await this.app.workspace.getLeaf('tab').openFile(file)
+            new Notice(
+                created
+                    ? `Knowii: saved as ${file.basename}.`
+                    : `Knowii: already saved as ${file.basename}.`
+            )
+        } catch (error: unknown) {
+            new Notice(
+                `Knowii: could not save (${error instanceof Error ? error.message : String(error)}).`
+            )
+        } finally {
+            saving.hide()
+        }
+    }
+
+    /** Ask the community, from a selection or a whole note. */
+    async askCommunity(initial: { title: string; body: string }): Promise<void> {
+        const client = this.client
+        if (!client) {
+            return
+        }
+        if (0 === client.knownSpaces().length) {
+            await this.watcher?.check()
+        }
+        new AskModal(this.app, client.knownSpaces(), initial, async (spaceId, title, body) => {
+            const path = await client.createPost(spaceId, title, body)
+            new Notice('Knowii: posted.')
+            if (Platform.isDesktopApp) {
+                void this.activateView(path)
+            }
+        }).open()
+    }
+
+    /** Title and body for "Ask the community" from the active editor. */
+    private askFromEditor(view: MarkdownView | null): { title: string; body: string } {
+        const selection = view?.editor.getSelection().trim() ?? ''
+        const noteTitle = view?.file?.basename ?? ''
+        if ('' !== selection) {
+            return { title: noteTitle, body: selection }
+        }
+        const text = view?.editor.getValue() ?? ''
+        return { title: noteTitle, body: text.replace(/^---\n[\s\S]*?\n---\n?/, '').trim() }
+    }
+
+    /** Quick reply to a conversation from the list or a notice. */
+    openReply(item: ActivityItem): void {
+        const client = this.client
+        if (!client || 'room' !== item.ref.kind) {
+            return
+        }
+        const uuid = item.ref.uuid
+        new ReplyModal(this.app, item.title, item.excerpt, async (text) => {
+            await client.sendMessage(uuid, text)
+            await this.markItemsRead([item], { quiet: true })
+            new Notice(`Knowii: sent to ${item.title}.`)
+        }).open()
+    }
+
+    /** Upcoming events; Enter opens one. */
+    async showEvents(): Promise<void> {
+        const reminders = this.reminders
+        if (!reminders) {
+            return
+        }
+        const loading = new Notice('Knowii: loading events…', 0)
+        try {
+            this.eventsRefreshedAt = Date.now()
+            await reminders.refresh()
+        } catch (error: unknown) {
+            new Notice(
+                `Knowii: events could not be read (${error instanceof Error ? error.message : String(error)}).`
+            )
+            return
+        } finally {
+            loading.hide()
+        }
+        new EventsModal(this.app, reminders.upcoming, (path) => {
+            if (Platform.isDesktopApp) {
+                void this.activateView(path)
+            } else {
+                window.open(buildCommunityUrl(this.settings.communityUrl, path))
+            }
+        }).open()
+    }
+
+    /** Editor and file menus: ask the community. */
+    private registerMenus(): void {
+        this.registerEvent(
+            this.app.workspace.on('editor-menu', (menu, editor, view) => {
+                if ('' === editor.getSelection().trim()) {
+                    return
+                }
+                menu.addItem((item) =>
+                    item
+                        .setTitle('Ask the Knowii community')
+                        .setIcon(KNOWII_ICON_ID)
+                        .onClick(() => {
+                            void this.askCommunity(
+                                this.askFromEditor(view instanceof MarkdownView ? view : null)
+                            )
+                        })
+                )
+            })
+        )
+        this.registerEvent(
+            this.app.workspace.on('file-menu', (menu, file) => {
+                if (!(file instanceof TFile) || 'md' !== file.extension) {
+                    return
+                }
+                menu.addItem((item) =>
+                    item
+                        .setTitle('Ask the Knowii community about this note')
+                        .setIcon(KNOWII_ICON_ID)
+                        .onClick(() => {
+                            void this.app.vault.cachedRead(file).then((text) =>
+                                this.askCommunity({
+                                    title: file.basename,
+                                    body: text.replace(/^---\n[\s\S]*?\n---\n?/, '').trim()
+                                })
+                            )
+                        })
+                )
+            })
+        )
     }
 
     /**
@@ -316,6 +593,9 @@ export class KnowiiCommunityPlugin extends Plugin {
             },
             archiveRead: () => {
                 void this.archiveRead()
+            },
+            showEvents: () => {
+                void this.showEvents()
             }
         })
         menu.showAtMouseEvent(event)
@@ -330,7 +610,11 @@ export class KnowiiCommunityPlugin extends Plugin {
             },
             openList: () => {
                 void this.showActivityList()
-            }
+            },
+            reply: (item) => {
+                this.openReply(item)
+            },
+            canReply: (item) => 'room' === item.ref.kind && 'directMessages' === item.category
         }
     }
 
@@ -527,7 +811,13 @@ export class KnowiiCommunityPlugin extends Plugin {
             markRead: (item) => this.markItemsRead([item]),
             archive: (item) => this.archiveItems([item]),
             markAllRead: () => this.markAllRead(),
-            archiveRead: () => this.archiveRead()
+            archiveRead: () => this.archiveRead(),
+            canSave: (item) => this.canSave(item.path),
+            save: (item) => this.saveAsNote(item.path),
+            canReply: (item) => 'room' === item.ref.kind && 'directMessages' === item.category,
+            reply: (item) => {
+                this.openReply(item)
+            }
         }
     }
 
@@ -713,6 +1003,10 @@ export class KnowiiCommunityPlugin extends Plugin {
         },
         showActivity: () => {
             void this.showActivityList()
+        },
+        canSave: (url) => this.canSave(url),
+        saveAsNote: (url) => {
+            void this.saveAsNote(url)
         }
     }
 
@@ -740,6 +1034,39 @@ export class KnowiiCommunityPlugin extends Plugin {
             name: "Show what's new in Knowii",
             callback: () => {
                 void this.showActivityList()
+            }
+        })
+
+        this.addCommand({
+            id: 'save-current-page',
+            name: 'Save the current Knowii page as a note',
+            checkCallback: (checking) => {
+                const url = this.openView()?.currentUrl() ?? null
+                if (!this.canSave(url)) {
+                    return false
+                }
+                if (!checking && url) {
+                    void this.saveAsNote(url)
+                }
+                return true
+            }
+        })
+
+        this.addCommand({
+            id: 'ask-community',
+            name: 'Ask the community',
+            callback: () => {
+                void this.askCommunity(
+                    this.askFromEditor(this.app.workspace.getActiveViewOfType(MarkdownView))
+                )
+            }
+        })
+
+        this.addCommand({
+            id: 'show-events',
+            name: 'Show upcoming Knowii events',
+            callback: () => {
+                void this.showEvents()
             }
         })
 
@@ -979,6 +1306,11 @@ export class KnowiiCommunityPlugin extends Plugin {
             }
             if ('boolean' === typeof data.watchWholeCommunity) {
                 draft.watchWholeCommunity = data.watchWholeCommunity
+            } else {
+                needToSaveSettings = true
+            }
+            if ('string' === typeof data.notesFolder && '' !== data.notesFolder.trim()) {
+                draft.notesFolder = data.notesFolder.trim()
             } else {
                 needToSaveSettings = true
             }

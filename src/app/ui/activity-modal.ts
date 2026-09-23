@@ -40,6 +40,12 @@ export interface ActivityListController {
     archive(item: ActivityItem): Promise<void>
     markAllRead(): Promise<void>
     archiveRead(): Promise<void>
+    /** Whether the item can be saved as a note (posts, chat messages). */
+    canSave(item: ActivityItem): boolean
+    save(item: ActivityItem): Promise<void>
+    /** Whether the item is a conversation that can be answered from here. */
+    canReply(item: ActivityItem): boolean
+    reply(item: ActivityItem): void
 }
 
 /** SuggestModal keeps its list behind `chooser`; typed as far as the list uses it. */
@@ -64,11 +70,12 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
         this.emptyStateText = 'Nothing matches.'
         this.updatePlaceholder()
         this.setInstructions([
-            { command: '↑↓', purpose: 'to navigate' },
-            { command: '↵', purpose: 'to open' },
-            { command: 'mod ↵', purpose: 'to mark as read' },
-            { command: 'alt ↵', purpose: 'to archive' },
-            { command: 'esc', purpose: 'to dismiss' }
+            { command: '↑↓ ctrl J/K', purpose: 'move' },
+            { command: '↵', purpose: 'open' },
+            { command: 'mod ↵', purpose: 'read' },
+            { command: 'ctrl E', purpose: 'archive' },
+            { command: 'mod S', purpose: 'save as note' },
+            { command: 'mod R', purpose: 'reply' }
         ])
         this.modalEl.addClass(`${CLS}-activity-modal`)
         this.renderToolbar()
@@ -81,14 +88,46 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
             }
             return false
         })
-        this.scope.register(['Alt'], 'Enter', (event) => {
+        const archive = (event: KeyboardEvent): false => {
             event.preventDefault()
             const item = this.selected()
             if (item) {
                 void this.run(() => this.controller.archive(item))
             }
             return false
+        }
+        this.scope.register(['Alt'], 'Enter', archive)
+        this.scope.register(['Ctrl'], 'e', archive)
+        this.scope.register(['Ctrl'], 'j', (event) => this.move(event, 1))
+        this.scope.register(['Ctrl'], 'k', (event) => this.move(event, -1))
+        this.scope.register(['Mod'], 's', (event) => {
+            event.preventDefault()
+            const item = this.selected()
+            if (item && this.controller.canSave(item)) {
+                void this.run(() => this.controller.save(item))
+            }
+            return false
         })
+        this.scope.register(['Mod'], 'r', (event) => {
+            event.preventDefault()
+            const item = this.selected()
+            if (item && this.controller.canReply(item)) {
+                this.close()
+                this.controller.reply(item)
+            }
+            return false
+        })
+    }
+
+    /** Keyboard triage: Ctrl+J / Ctrl+K move like the arrows. */
+    private move(event: KeyboardEvent, step: number): false {
+        event.preventDefault()
+        const chooser = this.suggestChooser()
+        const count = chooser?.values?.length ?? 0
+        if (chooser && count > 0) {
+            chooser.setSelectedItem((chooser.selectedItem + step + count) % count, event)
+        }
+        return false
     }
 
     override getSuggestions(query: string): ActivityItem[] {
@@ -120,6 +159,16 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
         }
 
         const actions = el.createDiv({ cls: `${CLS}-activity-actions` })
+        if (this.controller.canReply(item)) {
+            this.rowButton(actions, 'reply', 'Reply', () => {
+                this.close()
+                this.controller.reply(item)
+                return Promise.resolve()
+            })
+        }
+        if (this.controller.canSave(item)) {
+            this.rowButton(actions, 'file-down', 'Save as note', () => this.controller.save(item))
+        }
         if (item.unread) {
             this.rowButton(actions, 'check', 'Mark as read', () => this.controller.markRead(item))
         }

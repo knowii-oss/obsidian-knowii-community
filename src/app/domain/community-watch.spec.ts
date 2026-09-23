@@ -60,8 +60,8 @@ describe('parsers', () => {
                 ]
             })
         ).toEqual([
-            { id: 1, name: 'Lounge', slug: 'lounge', kind: 'chat', isMember: true },
-            { id: 2, name: 'x', slug: 'x', kind: 'basic', isMember: false }
+            { id: 1, name: 'Lounge', slug: 'lounge', kind: 'chat', isMember: true, canPost: false },
+            { id: 2, name: 'x', slug: 'x', kind: 'basic', isMember: false, canPost: false }
         ])
         expect(parseSpaceChatRoomUuid({ chat_room_uuid: 'abc' })).toBe('abc')
         expect(parseSpaceChatRoomUuid({})).toBeNull()

@@ -501,3 +501,35 @@
 .knowii-community-content button:disabled {
     cursor: default;
 }
+
+/* Compose windows: ask the community, reply. */
+.knowii-community-compose .knowii-community-compose-body {
+    width: 100%;
+    min-height: 8em;
+    resize: vertical;
+    font-family: inherit;
+}
+
+.knowii-community-compose .knowii-community-compose-title {
+    width: 100%;
+}
+
+.knowii-community-compose-quote {
+    margin: 0 0 0.75em;
+    padding: 0.4em 0.75em;
+    border-left: 3px solid #fd3585;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+}
+
+.knowii-community-compose-hint {
+    margin-top: 0.5em;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+/* Reply button inside a direct-message notice. */
+.knowii-community-notice-reply {
+    margin-top: 0.5em;
+    cursor: pointer;
+}

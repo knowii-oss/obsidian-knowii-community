@@ -52,6 +52,8 @@ export interface WatchableSpace {
     /** `basic` (posts), `chat`, `event`, `course`, … */
     readonly kind: string
     readonly isMember: boolean
+    /** The member may start posts here. */
+    readonly canPost: boolean
 }
 
 /** `GET /internal_api/spaces?per_page=100`. */
@@ -68,7 +70,8 @@ export function parseSpaces(json: unknown): WatchableSpace[] {
             name: str(record['name']) ?? slug,
             slug,
             kind: str(record['post_type']) ?? 'basic',
-            isMember: true === record['is_space_member']
+            isMember: true === record['is_space_member'],
+            canPost: isObject(record['policies']) && true === record['policies']['can_create_post']
         })
     }
     return spaces

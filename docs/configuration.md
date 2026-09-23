@@ -23,6 +23,7 @@ nav_order: 3
 | Notify me about …               | toggles  | all on                   | One switch per kind: direct messages, chat messages, thread replies, mentions, comments and replies, new posts, likes and reactions, events, new members, everything else. |
 | Everything that happens         | toggle   | on                       | Watch the whole community: new posts, comments and chat messages in every space.                                                                                           |
 | One switch per space            | toggles  | all on                   | Leave a space out of the whole-community watch. Only the spaces you belong to are listed and watched.                                                                      |
+| Folder for saved posts          | text     | `Knowii`                 | Where posts and threads saved as notes go.                                                                                                                                 |
 | Community address               | text     | `https://www.knowii.net` | Only change this if the community moves.                                                                                                                                   |
 | Stored session                  | button   |                          | Shows whether your Knowii session is stored; **Forget** removes it.                                                                                                        |
 

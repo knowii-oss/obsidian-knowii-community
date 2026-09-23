@@ -69,7 +69,8 @@ function build(state: WatchState) {
         checkNow: () => opened.push('check'),
         openPath: (path) => opened.push(path),
         markAllRead: () => opened.push('mark-all'),
-        archiveRead: () => opened.push('archive-read')
+        archiveRead: () => opened.push('archive-read'),
+        showEvents: () => opened.push('events')
     })
     return { menu, opened }
 }
@@ -83,6 +84,7 @@ describe('ribbon activity menu', () => {
             "Show what's new (2 unread)",
             'Mark all as read',
             'Archive read',
+            'Upcoming events',
             'Check now'
         ])
         menu.entries[0]?.click?.()
@@ -105,11 +107,12 @@ describe('ribbon activity menu', () => {
             "Show what's new",
             'Mark all as read',
             'Archive read',
+            'Upcoming events',
             'Check now',
             'Admin: Dashboard',
             'Admin: Audience'
         ])
-        menu.entries[6]?.click?.()
+        menu.entries[7]?.click?.()
         expect(opened).toEqual(['/settings/audience/manage'])
     })
 

@@ -64,6 +64,9 @@ export interface CommunityViewHost {
     unreadCount(): number
     /** Show the list of what is unread. */
     showActivity(): void
+    /** Whether a community URL can be saved as a note. */
+    canSave(url: string | null): boolean
+    saveAsNote(url: string): void
 }
 
 /**
@@ -94,6 +97,8 @@ export class KnowiiCommunityView extends ItemView {
     private forwardButton: HTMLElement | null = null
     private adminButton: HTMLElement | null = null
     private activityBadge: HTMLElement | null = null
+    /** Shown only on pages that can be saved (a post, a chat message). */
+    private saveButton: HTMLElement | null = null
 
     constructor(leaf: WorkspaceLeaf, host: CommunityViewHost) {
         super(leaf)
@@ -212,6 +217,7 @@ export class KnowiiCommunityView extends ItemView {
         this.forwardButton = null
         this.adminButton = null
         this.activityBadge = null
+        this.saveButton = null
         this.contentEl.empty()
     }
 
@@ -249,6 +255,12 @@ export class KnowiiCommunityView extends ItemView {
         }
 
         const actions = toolbar.createDiv({ cls: `${CLS}-actions` })
+        this.saveButton = this.toolbarButton(actions, 'file-down', 'Save as note', () => {
+            const url = this.currentUrl()
+            if (url && this.host.canSave(url)) {
+                this.host.saveAsNote(url)
+            }
+        })
         const activityButton = this.toolbarButton(actions, 'inbox', "What's new", () => {
             this.host.showActivity()
         })
@@ -296,6 +308,10 @@ export class KnowiiCommunityView extends ItemView {
             onClick()
         })
         return button
+    }
+
+    private updateSaveButton(): void {
+        this.saveButton?.toggle(this.host.canSave(this.currentUrl()))
     }
 
     private updateNavButtons(): void {
@@ -436,6 +452,7 @@ export class KnowiiCommunityView extends ItemView {
         })
         const onNavigate = (): void => {
             this.updateNavButtons()
+            this.updateSaveButton()
             const current = this.currentUrl()
             if (current) {
                 this.host.saveLastUrl(current)
