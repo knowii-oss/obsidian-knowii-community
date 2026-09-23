@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.1.1 (2026-09-23)
+
+### Bug Fixes
+
+- first check right after startup, and open the pane on the requested page
+
 ## 1.1.0 (2026-09-23)
 
 ### Features
