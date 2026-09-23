@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.2.0 (2026-09-23)
+
+### Features
+
+- choose when system notifications show, and only watch spaces you belong to
+
 ## 1.1.1 (2026-09-23)
 
 ### Bug Fixes

@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.1.1...1.2.0) (2026-09-23)
+
+### Features
+
+* choose when system notifications show, and only watch spaces you belong to ([789e3e8](https://github.com/knowii-oss/obsidian-knowii-community/commit/789e3e80382710b4d1f1702dec46b595c5412056))
+
 ## [1.1.1](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.1.0...1.1.1) (2026-09-23)
 
 ### Bug Fixes
@@ -20,5 +26,6 @@ All notable changes to this project will be documented in this file.
 
 * open the Knowii community in a pane inside Obsidian ([6378940](https://github.com/knowii-oss/obsidian-knowii-community/commit/63789405b26aa8423414b6714950546ada6d6db6))
 * use the Knowii logo as the plugin icon ([1b6cf87](https://github.com/knowii-oss/obsidian-knowii-community/commit/1b6cf877e687ad4853f899a8213bc124bc1077f5))
+
 
 
