@@ -1,5 +1,15 @@
 # Release Notes
 
+## 1.4.0 (2026-09-23)
+
+### Features
+
+- **plugin:** use Knowii on phones and tablets, with a layout that fits every screen
+
+### Bug Fixes
+
+- **plugin:** keep each vault's Knowii sign-in to itself; a new vault starts signed out
+
 ## 1.3.0 (2026-09-23)
 
 ### Features

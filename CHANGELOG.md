@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.3.0...1.4.0) (2026-09-23)
+
+### Features
+
+* **plugin:** use Knowii on phones and tablets, with a layout that fits every screen ([61c6409](https://github.com/knowii-oss/obsidian-knowii-community/commit/61c640991399cb2f7c7e57d96624a6ec515ab13e))
+
+### Bug Fixes
+
+* **plugin:** keep each vault's Knowii sign-in to itself; a new vault starts signed out ([549958c](https://github.com/knowii-oss/obsidian-knowii-community/commit/549958cb82a6ab1e6dc43d4f5a3e444134c52eff))
+
 ## [1.3.0](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.2.0...1.3.0) (2026-09-23)
 
 ### Features
@@ -32,6 +42,7 @@ All notable changes to this project will be documented in this file.
 
 * open the Knowii community in a pane inside Obsidian ([6378940](https://github.com/knowii-oss/obsidian-knowii-community/commit/63789405b26aa8423414b6714950546ada6d6db6))
 * use the Knowii logo as the plugin icon ([1b6cf87](https://github.com/knowii-oss/obsidian-knowii-community/commit/1b6cf877e687ad4853f899a8213bc124bc1077f5))
+
 
 
 
