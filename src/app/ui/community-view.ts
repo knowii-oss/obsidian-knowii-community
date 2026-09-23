@@ -10,6 +10,8 @@ import {
 } from '../domain/community-links'
 import type { PluginSettings } from '../types/plugin-settings.intf'
 import { log } from '../../utils/log'
+import { CommunityInbox } from './community-inbox'
+import type { InboxHost } from './community-inbox'
 
 export const COMMUNITY_VIEW_TYPE = 'knowii-community'
 
@@ -41,6 +43,9 @@ interface DidFailLoadEvent extends Event {
     isMainFrame?: boolean
 }
 
+/** How old a check may be when the inbox opens before it checks again. */
+const INBOX_FRESH_MS = 60_000
+
 /** Electron's "navigation aborted" code: a new load superseded the previous one. */
 const ERR_ABORTED = -3
 
@@ -53,6 +58,8 @@ export interface CommunityViewHost {
     getSettings(): PluginSettings
     /** The vault's cookie partition (see `communityPartition`). */
     partition(): string
+    /** Where the community cannot be hosted: the inbox the pane shows instead. */
+    inbox: Omit<InboxHost, 'openInBrowser'>
     loadLastUrl(): string | null
     saveLastUrl(url: string): void
     hasSeenWelcome(): boolean
@@ -79,8 +86,9 @@ export interface CommunityViewHost {
  * First open shows a welcome card (sign in, or discover Knowii) instead of a
  * blank page; afterwards the pane restores the last page when asked to.
  *
- * Desktop only at runtime: the mobile app has no `<webview>`, so the pane
- * offers to open the community in the browser instead.
+ * The mobile apps have no `<webview>`, and the community refuses to be framed,
+ * so there the pane is an inbox of what's new (see `CommunityInbox`) and pages
+ * open in the browser.
  */
 export class KnowiiCommunityView extends ItemView {
     override navigation = false
@@ -101,6 +109,7 @@ export class KnowiiCommunityView extends ItemView {
     private activityBadge: HTMLElement | null = null
     /** Shown only on pages that can be saved (a post, a chat message). */
     private saveButton: HTMLElement | null = null
+    private inbox: CommunityInbox | null = null
 
     constructor(leaf: WorkspaceLeaf, host: CommunityViewHost) {
         super(leaf)
@@ -132,8 +141,9 @@ export class KnowiiCommunityView extends ItemView {
         this.render(current)
     }
 
-    /** Refresh the toolbar's activity bits: unread badge, admin menu. */
+    /** Refresh the activity bits: unread badge, admin menu, the inbox. */
     updateActivity(unread: number, isAdmin: boolean): void {
+        this.inbox?.update()
         this.adminButton?.toggle(isAdmin)
         if (this.activityBadge) {
             this.activityBadge.toggle(unread > 0)
@@ -144,6 +154,10 @@ export class KnowiiCommunityView extends ItemView {
     /** Navigate the hosted community to a path such as `/feed`. */
     navigateTo(path: string): void {
         const url = buildCommunityUrl(this.host.getSettings().communityUrl, path)
+        if (!Platform.isDesktopApp) {
+            this.host.openExternal(url)
+            return
+        }
         if (!this.webviewReady) {
             this.pendingUrl = url
         }
@@ -152,7 +166,9 @@ export class KnowiiCommunityView extends ItemView {
 
     /** Reload the hosted community. */
     reload(): void {
-        if (this.webview) {
+        if (this.inbox) {
+            void this.host.inbox.refresh()
+        } else if (this.webview) {
             this.webview.reload()
         } else {
             this.render()
@@ -187,7 +203,7 @@ export class KnowiiCommunityView extends ItemView {
         root.addClass(`${CLS}-content`)
 
         if (!Platform.isDesktopApp) {
-            this.renderUnsupported(root, settings)
+            this.renderInbox(root, settings)
             return
         }
 
@@ -212,6 +228,7 @@ export class KnowiiCommunityView extends ItemView {
     }
 
     private teardown(): void {
+        this.inbox = null
         this.webview = null
         this.webviewReady = false
         this.bodyEl = null
@@ -240,6 +257,25 @@ export class KnowiiCommunityView extends ItemView {
         })
         this.toolbarButton(nav, 'rotate-cw', 'Reload', () => {
             this.reload()
+        })
+
+        // Narrow panes (a sidebar) fold the shortcuts into this menu; CSS
+        // container queries pick which of the two shows.
+        const goTo = this.toolbarButton(nav, 'menu', 'Go to', () => {})
+        goTo.addClass(`${CLS}-goto`)
+        goTo.addEventListener('click', (event) => {
+            const menu = new Menu()
+            for (const destination of COMMUNITY_DESTINATIONS) {
+                menu.addItem((item) =>
+                    item
+                        .setTitle(destination.label)
+                        .setIcon(destination.icon)
+                        .onClick(() => {
+                            this.navigateTo(destination.path)
+                        })
+                )
+            }
+            menu.showAtMouseEvent(event)
         })
 
         const shortcuts = toolbar.createDiv({ cls: `${CLS}-shortcuts` })
@@ -366,24 +402,19 @@ export class KnowiiCommunityView extends ItemView {
         })
     }
 
-    private renderUnsupported(root: HTMLElement, settings: PluginSettings): void {
-        const card = root.createDiv({ cls: `${CLS}-card` })
-        const mark = card.createDiv({ cls: `${CLS}-card-mark` })
-        setIcon(mark, KNOWII_ICON_ID)
-        card.createEl('h2', { cls: `${CLS}-card-title`, text: 'Knowii' })
-        card.createEl('p', {
-            cls: `${CLS}-card-text`,
-            text: 'The community pane is available on desktop. On this device, open Knowii in your browser.'
+    private renderInbox(root: HTMLElement, settings: PluginSettings): void {
+        this.inbox = new CommunityInbox(root, {
+            ...this.host.inbox,
+            openInBrowser: (path) => {
+                this.host.openExternal(buildCommunityUrl(settings.communityUrl, path))
+            }
         })
-        const buttons = card.createDiv({ cls: `${CLS}-card-buttons` })
-        const open = buttons.createEl('button', {
-            cls: `mod-cta ${CLS}-card-button`,
-            text: 'Open Knowii',
-            attr: { type: 'button' }
-        })
-        open.addEventListener('click', () => {
-            this.host.openExternal(buildCommunityUrl(settings.communityUrl, '/'))
-        })
+        this.inbox.render()
+        // Opening the pane is asking what's new: check unless a check is recent.
+        const state = this.host.inbox.state()
+        if (null === state.checkedAt || Date.now() - state.checkedAt > INBOX_FRESH_MS) {
+            void this.host.inbox.refresh()
+        }
     }
 
     private renderLoadError(parent: HTMLElement, description: string, url: string): void {

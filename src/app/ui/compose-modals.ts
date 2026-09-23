@@ -1,4 +1,4 @@
-import { Modal, Notice, Setting, SuggestModal } from 'obsidian'
+import { Modal, Notice, Platform, Setting, SuggestModal } from 'obsidian'
 import type { App } from 'obsidian'
 import type { WatchableSpace } from '../domain/community-watch'
 import type { CommunityEvent } from '../domain/community-content'
@@ -99,7 +99,8 @@ export class AskModal extends Modal {
         })
         const area = this.contentEl.createEl('textarea', { cls: `${CLS}-compose-body` })
         area.value = this.initial.body
-        area.rows = 12
+        // A phone's keyboard takes half the screen: keep the buttons in view.
+        area.rows = Platform.isPhone ? 6 : 12
 
         const buttons = this.contentEl.createDiv({ cls: 'modal-button-container' })
         const post = buttons.createEl('button', { cls: 'mod-cta', text: 'Post' })
@@ -116,7 +117,9 @@ export class AskModal extends Modal {
         })
         this.contentEl.createDiv({
             cls: `${CLS}-compose-hint`,
-            text: 'Published right away, as you. Ctrl/Cmd+Enter posts.'
+            text: Platform.isMobile
+                ? 'Published right away, as you.'
+                : 'Published right away, as you. Ctrl/Cmd+Enter posts.'
         })
     }
 
@@ -143,7 +146,7 @@ export class ReplyModal extends Modal {
             this.contentEl.createEl('blockquote', { cls: `${CLS}-compose-quote`, text: this.quote })
         }
         const area = this.contentEl.createEl('textarea', { cls: `${CLS}-compose-body` })
-        area.rows = 6
+        area.rows = Platform.isPhone ? 4 : 6
         area.placeholder = 'Your message'
         const buttons = this.contentEl.createDiv({ cls: 'modal-button-container' })
         const sendButton = buttons.createEl('button', { cls: 'mod-cta', text: 'Send' })
@@ -158,7 +161,9 @@ export class ReplyModal extends Modal {
         buttons.createEl('button', { text: 'Cancel' }).addEventListener('click', () => {
             this.close()
         })
-        this.contentEl.createDiv({ cls: `${CLS}-compose-hint`, text: 'Ctrl/Cmd+Enter sends.' })
+        if (!Platform.isMobile) {
+            this.contentEl.createDiv({ cls: `${CLS}-compose-hint`, text: 'Ctrl/Cmd+Enter sends.' })
+        }
         window.setTimeout(() => {
             area.focus()
         }, 0)

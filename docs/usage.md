@@ -130,7 +130,7 @@ Members who are not admins never see any of it.
 
 ## Your session
 
-The plugin stores your Knowii session (the sign-in cookies of the pane) in its settings file, `.obsidian/plugins/knowii-community/data.json`. This is what makes the notifications work:
+The plugin stores your Knowii session (the sign-in cookies of the pane) in its settings file, `.obsidian/plugins/knowii-community/data.json`. Each vault has its own: signing in from one vault never signs in another vault on the same computer, and a new vault starts signed out. This is what makes the notifications work:
 
 - on a desktop, checks use the pane's own session; the stored copy is kept in step with it;
 - on your other devices, including mobile, the stored copy arrives with your vault and the plugin checks with it, so you get notified there without signing in again;
@@ -172,6 +172,18 @@ The plugin hands notifications to your operating system; the system decides whet
 
 Run **Check Knowii for new activity now** after changing something: if there is anything unread, a notification follows.
 
-## Mobile
+## Mobile and tablets
 
-The pane needs the desktop app. On mobile, the plugin offers to open Knowii in your browser. Notifications and the "what's new" list work on mobile too, with the session stored from a desktop sign-in; items open in your browser there.
+The Obsidian mobile apps cannot show the community itself inside a pane, so there the Knowii pane is your inbox of what's new:
+
+- **All** and **Unread** tabs, and a filter field;
+- tap an item to open it in your browser (it is marked as read, as in a mail client);
+- every item has its own buttons: **Reply** (direct messages), **Save as note** (posts and messages), **Mark as read** and **Archive**;
+- the header has **Check now**, **Upcoming events**, **Ask the community**, and a menu with **Mark all as read**, **Archive read**, **Open Knowii in the browser** (and the admin pages for admins);
+- **Mark all as read** and **Archive read** also sit at the bottom of the list.
+
+Sign in once in the pane on a desktop: the session reaches your phone and tablet with your vault. Until then, the pane explains this and offers the browser.
+
+The pane, the "what's new" list and the compose windows adapt to the space they have, from a phone to a wide monitor: in a narrow sidebar the toolbar keeps its icons and folds the shortcuts into a **Go to** menu; on touch screens buttons are finger-sized and the actions of each item are always shown.
+
+Settings that only make sense on a desktop (toolbar, last page, zoom, system notifications, status bar) are hidden on mobile.

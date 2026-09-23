@@ -983,6 +983,21 @@ export class KnowiiCommunityPlugin extends Plugin {
     private readonly viewHost: CommunityViewHost = {
         getSettings: () => this.settings,
         partition: () => this.partition,
+        inbox: {
+            state: () => this.watcher?.current ?? INITIAL_WATCH_STATE,
+            list: () => this.listController(),
+            refresh: async () => {
+                await this.watcher?.check()
+            },
+            showEvents: () => {
+                void this.showEvents()
+            },
+            ask: () => {
+                void this.askCommunity(
+                    this.askFromEditor(this.app.workspace.getActiveViewOfType(MarkdownView))
+                )
+            }
+        },
         loadLastUrl: () => {
             const value: unknown = this.app.loadLocalStorage(LAST_URL_KEY)
             return 'string' === typeof value ? value : null

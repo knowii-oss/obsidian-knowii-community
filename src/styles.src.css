@@ -107,6 +107,9 @@
     --knowii-magenta: #e5007d;
     --knowii-magenta-text: #ff1493;
     @apply flex h-full flex-col overflow-hidden p-0;
+    /* The toolbar and the inbox adapt to the pane's width, not the window's:
+       the same window can hold the pane in a main tab or a narrow sidebar. */
+    container-type: inline-size;
 }
 
 /* Toolbar */
@@ -171,10 +174,34 @@
     @apply text-xs;
 }
 
-/* Sidebar-narrow toolbars keep the icons and drop the words. */
-@container (max-width: 640px) {
+/* The "Go to" menu only shows when the shortcuts are folded into it. */
+.knowii-community-content .knowii-community-goto {
+    display: none;
+}
+
+/* Panes too narrow for the labelled shortcuts (about 900px with the admin
+   and save buttons) keep the icons and drop the words, so the toolbar stays
+   on one line instead of wrapping. */
+@container (max-width: 960px) {
     .knowii-community-shortcut-label {
         @apply hidden;
+    }
+}
+
+/* Narrower still: the shortcuts fold into the "Go to" menu, the brand keeps
+   its mark only, and the toolbar stays on one line. */
+@container (max-width: 480px) {
+    .knowii-community-toolbar {
+        flex-wrap: nowrap;
+    }
+
+    .knowii-community-shortcuts,
+    .knowii-community-brand-name {
+        display: none;
+    }
+
+    .knowii-community-content .knowii-community-goto {
+        display: flex;
     }
 }
 
@@ -191,6 +218,12 @@
 /* Welcome, unsupported and error cards */
 .knowii-community-card {
     @apply m-auto flex max-w-[440px] flex-col items-center gap-3 px-8 py-10 text-center;
+}
+
+@container (max-width: 400px) {
+    .knowii-community-card {
+        @apply px-4 py-6;
+    }
 }
 
 .knowii-community-card-mark {
@@ -532,4 +565,240 @@
 .knowii-community-notice-reply {
     margin-top: 0.5em;
     cursor: pointer;
+}
+
+/* ========================================
+   INBOX PANE (phones and tablets)
+   The community cannot be hosted there, so
+   the pane lists what's new. Touch first:
+   every action is a visible, finger-sized
+   button; the list reads at a comfortable
+   measure on a wide tablet.
+   ======================================== */
+
+.knowii-community-inbox {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    max-width: 820px;
+    height: 100%;
+    margin: 0 auto;
+}
+
+.knowii-community-inbox-header {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.5em;
+    align-items: center;
+    padding: 0.5em 0.75em;
+    background-color: var(--background-secondary);
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.knowii-community-inbox-header .knowii-community-brand {
+    border-right: none;
+}
+
+.knowii-community-inbox-count {
+    min-width: 1.5em;
+    padding: 0 0.4em;
+    border-radius: 999px;
+    background-color: #fd3585;
+    color: #fff;
+    font-size: var(--font-ui-smaller);
+    font-weight: var(--font-bold);
+    line-height: 1.5em;
+    text-align: center;
+}
+
+.knowii-community-button.is-busy .knowii-community-button-icon {
+    animation: knowii-community-spin 1s linear infinite;
+}
+
+@keyframes knowii-community-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.knowii-community-inbox-controls {
+    display: flex;
+    flex-shrink: 0;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    align-items: center;
+    padding: 0.5em 0.75em;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.knowii-community-inbox-filters {
+    display: inline-flex;
+    padding: 2px;
+    border-radius: var(--radius-m, 8px);
+    background-color: var(--background-modifier-hover);
+}
+
+.knowii-community-content .knowii-community-inbox-filter {
+    padding: 0.3em 0.9em;
+    border: none;
+    border-radius: var(--radius-s, 6px);
+    background: transparent;
+    box-shadow: none;
+    color: var(--text-muted);
+}
+
+.knowii-community-content .knowii-community-inbox-filter.is-active {
+    background-color: var(--background-primary);
+    color: var(--text-normal);
+    font-weight: var(--font-semibold);
+}
+
+.knowii-community-content .knowii-community-inbox-search {
+    flex: 1 1 6em;
+    width: auto;
+    min-width: 0;
+}
+
+.knowii-community-inbox-status {
+    flex-basis: 100%;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.knowii-community-inbox-status:empty {
+    display: none;
+}
+
+.knowii-community-inbox-list {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    min-height: 0;
+    overflow-y: auto;
+    padding-bottom: var(--safe-area-inset-bottom, 0);
+}
+
+.knowii-community-inbox-row {
+    padding: 0.75em;
+    border-bottom: 1px solid var(--background-modifier-border);
+    cursor: pointer;
+}
+
+.knowii-community-inbox-row:hover {
+    background-color: var(--background-modifier-hover);
+}
+
+/* Two lines of excerpt in the pane (the list window keeps one). */
+.knowii-community-inbox-row .knowii-community-activity-excerpt {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 2;
+    white-space: normal;
+}
+
+/* Row actions sit under the text on narrow panes, beside it on wide ones. */
+.knowii-community-inbox-row.knowii-community-activity {
+    flex-wrap: wrap;
+}
+
+.knowii-community-inbox-row .knowii-community-activity-actions {
+    opacity: 1;
+}
+
+@container (max-width: 480px) {
+    .knowii-community-inbox-row .knowii-community-activity-actions {
+        flex-basis: 100%;
+        justify-content: flex-end;
+    }
+}
+
+.knowii-community-inbox-footer {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    justify-content: center;
+    padding: 1em 0.75em;
+}
+
+/* ========================================
+   TOUCH SCREENS
+   Finger-sized targets, and no hover-only
+   controls: what hover reveals on desktop is
+   always shown where there is no hover.
+   ======================================== */
+
+.is-mobile .knowii-community-content .knowii-community-button {
+    min-width: 40px;
+    height: 40px;
+    justify-content: center;
+}
+
+.is-mobile .knowii-community-button-icon svg {
+    width: 20px;
+    height: 20px;
+}
+
+.is-mobile .knowii-community-activity-action {
+    min-width: 36px;
+    min-height: 36px;
+    padding: 0.5em;
+}
+
+.is-mobile .knowii-community-activity-actions {
+    opacity: 1;
+}
+
+@media (hover: none) {
+    .knowii-community-activity-actions {
+        opacity: 1;
+    }
+}
+
+/* The list window on a phone: actions wrap under the text, toolbar buttons
+   share the width. */
+.is-phone .knowii-community-activity-modal .knowii-community-activity {
+    flex-wrap: wrap;
+}
+
+.is-phone .knowii-community-activity-modal .knowii-community-activity-actions {
+    flex-basis: 100%;
+    justify-content: flex-end;
+}
+
+.is-phone .knowii-community-activity-toolbar {
+    justify-content: stretch;
+}
+
+.is-phone .knowii-community-activity-toolbar button {
+    flex: 1;
+}
+
+/* Compose windows on a phone: labels above their fields, full-width fields. */
+.is-phone .knowii-community-compose .setting-item {
+    flex-direction: column;
+    gap: 0.5em;
+    align-items: stretch;
+}
+
+.is-phone .knowii-community-compose .setting-item-control select,
+.is-phone .knowii-community-compose .setting-item-control input {
+    width: 100%;
+    max-width: none;
+}
+
+.is-phone .knowii-community-compose .modal-button-container button {
+    flex: 1;
+}
+
+/* "What's new" tab on a phone: less padding, link rows stack. */
+.is-phone .knowii-community-whats-new-view .knowii-community-whats-new-content {
+    padding: 1em 1em 1.5em;
+}
+
+.is-phone .knowii-community-whats-new-notes {
+    padding: 0.75em 1em 1.25em;
+}
+
+.is-phone .knowii-community-whats-new-body .knowii-community-whats-new-links .setting-item {
+    flex-wrap: wrap;
 }

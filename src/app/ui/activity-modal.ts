@@ -1,7 +1,8 @@
-import { SuggestModal, setIcon, setTooltip } from 'obsidian'
+import { Platform, SuggestModal, setTooltip } from 'obsidian'
 import type { App } from 'obsidian'
 import type { ActivityItem } from '../domain/community-activity'
-import { categoryInfo, formatAge } from '../domain/community-activity'
+import { categoryInfo } from '../domain/community-activity'
+import { renderActivityActions, renderActivityContent } from './activity-row'
 
 const CLS = 'knowii-community'
 
@@ -48,6 +49,16 @@ export interface ActivityListController {
     reply(item: ActivityItem): void
 }
 
+/** Keyboard shortcuts of the list, shown under it on desktop. */
+const KEYBOARD_INSTRUCTIONS = [
+    { command: '↑↓ ctrl J/K', purpose: 'move' },
+    { command: '↵', purpose: 'open' },
+    { command: 'mod ↵', purpose: 'read' },
+    { command: 'ctrl E', purpose: 'archive' },
+    { command: 'mod S', purpose: 'save as note' },
+    { command: 'mod R', purpose: 'reply' }
+]
+
 /** SuggestModal keeps its list behind `chooser`; typed as far as the list uses it. */
 interface Chooser {
     selectedItem: number
@@ -69,14 +80,10 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
         this.limit = 300
         this.emptyStateText = 'Nothing matches.'
         this.updatePlaceholder()
-        this.setInstructions([
-            { command: '↑↓ ctrl J/K', purpose: 'move' },
-            { command: '↵', purpose: 'open' },
-            { command: 'mod ↵', purpose: 'read' },
-            { command: 'ctrl E', purpose: 'archive' },
-            { command: 'mod S', purpose: 'save as note' },
-            { command: 'mod R', purpose: 'reply' }
-        ])
+        // Keyboard hints mean nothing on a touch screen; they only eat its height.
+        if (!Platform.isMobile) {
+            this.setInstructions(KEYBOARD_INSTRUCTIONS)
+        }
         this.modalEl.addClass(`${CLS}-activity-modal`)
         this.renderToolbar()
 
@@ -135,44 +142,21 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
     }
 
     override renderSuggestion(item: ActivityItem, el: HTMLElement): void {
-        const info = categoryInfo(item.category)
-        el.addClass(`${CLS}-activity`)
-        el.toggleClass('is-unread', item.unread)
-        const icon = el.createSpan({ cls: `${CLS}-activity-icon` })
-        setIcon(icon, info.icon)
-        const body = el.createDiv({ cls: `${CLS}-activity-body` })
-        const head = body.createDiv({ cls: `${CLS}-activity-head` })
-        if (item.unread) {
-            head.createSpan({ cls: `${CLS}-activity-dot`, attr: { 'aria-label': 'Unread' } })
-        }
-        head.createSpan({ cls: `${CLS}-activity-title`, text: item.title })
-        head.createSpan({ cls: `${CLS}-activity-category`, text: info.label })
-        if (item.occurredAt > 0) {
-            head.createSpan({
-                cls: `${CLS}-activity-time`,
-                text: formatAge(item.occurredAt, Date.now())
-            })
-        }
-        body.createDiv({ cls: `${CLS}-activity-summary`, text: item.summary })
-        if (item.excerpt) {
-            body.createDiv({ cls: `${CLS}-activity-excerpt`, text: item.excerpt })
-        }
-
-        const actions = el.createDiv({ cls: `${CLS}-activity-actions` })
-        if (this.controller.canReply(item)) {
-            this.rowButton(actions, 'reply', 'Reply', () => {
-                this.close()
-                this.controller.reply(item)
-                return Promise.resolve()
-            })
-        }
-        if (this.controller.canSave(item)) {
-            this.rowButton(actions, 'file-down', 'Save as note', () => this.controller.save(item))
-        }
-        if (item.unread) {
-            this.rowButton(actions, 'check', 'Mark as read', () => this.controller.markRead(item))
-        }
-        this.rowButton(actions, 'archive', 'Archive', () => this.controller.archive(item))
+        renderActivityContent(el, item, Date.now())
+        renderActivityActions(
+            el,
+            item,
+            {
+                ...this.controller,
+                reply: (target) => {
+                    this.close()
+                    this.controller.reply(target)
+                }
+            },
+            (action) => {
+                void this.run(action)
+            }
+        )
     }
 
     override onChooseSuggestion(item: ActivityItem): void {
@@ -191,30 +175,6 @@ export class ActivityModal extends SuggestModal<ActivityItem> {
             void this.run(() => this.controller.archiveRead())
         })
         this.modalEl.insertBefore(bar, this.resultContainerEl)
-    }
-
-    private rowButton(
-        parent: HTMLElement,
-        icon: string,
-        label: string,
-        action: () => Promise<void>
-    ): void {
-        const button = parent.createEl('button', {
-            cls: `${CLS}-activity-action clickable-icon`,
-            attr: { 'aria-label': label, 'type': 'button' }
-        })
-        setIcon(button, icon)
-        setTooltip(button, label)
-        // Keep the row from being chosen (opened) and the input from losing focus.
-        button.addEventListener('mousedown', (event) => {
-            event.preventDefault()
-            event.stopPropagation()
-        })
-        button.addEventListener('click', (event) => {
-            event.preventDefault()
-            event.stopPropagation()
-            void this.run(action)
-        })
     }
 
     /** Runs an action, then redraws the list where the member was. */

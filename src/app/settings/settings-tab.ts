@@ -1,4 +1,4 @@
-import { Notice, PluginSettingTab } from 'obsidian'
+import { Notice, Platform, PluginSettingTab } from 'obsidian'
 import type { App, SettingDefinitionItem, SettingGroupItem } from 'obsidian'
 import type KnowiiCommunityPlugin from '../../main'
 import { BUY_ME_A_COFFEE_BADGE_DATA_URL } from '../assets/buy-me-a-coffee'
@@ -103,16 +103,20 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                     {
                         name: 'Show the toolbar',
                         desc: 'Back, forward, reload, shortcuts to the feed, messages, notifications and events, and "Open in browser".',
+                        // The mobile pane is an inbox: no toolbar, page or zoom there.
+                        visible: () => Platform.isDesktopApp,
                         control: { type: 'toggle', key: 'showToolbar' }
                     },
                     {
                         name: 'Reopen the last page',
                         desc: 'Come back to the page you were on, instead of the community home, when the pane opens.',
+                        visible: () => Platform.isDesktopApp,
                         control: { type: 'toggle', key: 'rememberLastPage' }
                     },
                     {
                         name: 'Zoom',
                         desc: 'Size of the community inside the pane. Handy in a narrow sidebar.',
+                        visible: () => Platform.isDesktopApp,
                         control: {
                             type: 'slider',
                             key: 'zoomPercent',
@@ -162,7 +166,8 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                     {
                         name: 'System notifications',
                         desc: "Also use your computer's notifications for new activity. Click one to open the item in Obsidian.",
-                        visible: () => this.plugin.settings.notificationsEnabled,
+                        visible: () =>
+                            Platform.isDesktopApp && this.plugin.settings.notificationsEnabled,
                         control: {
                             type: 'dropdown',
                             key: 'desktopNotifications',
@@ -176,7 +181,9 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                     {
                         name: 'Unread counts in the status bar',
                         desc: 'Unread notifications and messages at the bottom of the window. Click to see what is new.',
-                        visible: () => this.plugin.settings.notificationsEnabled,
+                        // The mobile apps have no status bar.
+                        visible: () =>
+                            Platform.isDesktopApp && this.plugin.settings.notificationsEnabled,
                         control: { type: 'toggle', key: 'showStatusBarBadge' }
                     },
                     {

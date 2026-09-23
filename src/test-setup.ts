@@ -73,6 +73,12 @@ void mock.module('obsidian', () => ({
             return this
         }
     },
+    Platform: {
+        isDesktopApp: true,
+        isMobile: false,
+        isPhone: false,
+        isTablet: false
+    },
     Menu: class Menu {
         addItem(_cb: (item: unknown) => unknown) {
             return this

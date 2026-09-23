@@ -3,7 +3,10 @@
 The plugin hosts the community in a pane, and watches it in the background for new activity.
 
 - `src/app/plugin.ts`: lifecycle, settings (validated on load, persisted through one serialized write path), the view registration, ribbon and commands. It hands the pane a `CommunityViewHost` so the view never touches the plugin instance.
-- `src/app/ui/community-view.ts`: the `ItemView`. Toolbar (brand, navigation, shortcuts, open in browser) over a `<webview>` with a persistent partition (`persist:knowii-community`). Welcome card on first open, error card when the community cannot be loaded, browser hand-off on mobile.
+- `src/app/ui/community-view.ts`: the `ItemView`. Toolbar (brand, navigation, shortcuts, "Go to" menu for narrow panes, open in browser) over a `<webview>` with a persistent per-vault partition (`communityPartition(vaultId(app))` = `persist:knowii-community-<app.appId>`). Welcome card on first open, error card when the community cannot be loaded. Where `Platform.isDesktopApp` is false it renders `CommunityInbox` instead, and `navigateTo` opens the browser.
+- `src/app/ui/community-inbox.ts`: the mobile pane. Header (unread count, check now, events, ask, more menu), All/Unread tabs and filter, rows from `activity-row.ts` with always-visible actions, signed-out/error/empty cards. Checks on open when the last check is over a minute old.
+- `src/app/ui/activity-row.ts`: row content and row actions shared by the "what's new" list and the inbox.
+- Responsive CSS: `.knowii-community-content` is an inline-size container; toolbar labels drop at 960px, shortcuts fold into "Go to" at 480px, cards shrink at 400px. Touch sizes under `.is-mobile`, phone layouts under `.is-phone`, hover-only actions shown under `@media (hover: none)`.
 - `src/app/domain/community-links.ts`: the only place that knows URLs: base URL normalization, destinations, host check.
 - `src/app/domain/community-activity.ts`: pure parsers for the community's web endpoints (`/internal_api/...`: current contact, notification counts and list, chat rooms, unread rooms and threads, threads, spaces), categories, item keys, seen-key bookkeeping. Every response is `unknown` until parsed.
 - `src/app/domain/session-cookies.ts`: the stored session: validation, `Cookie` header, `Set-Cookie` merging, sign-in fingerprint (only auth cookie changes trigger a write).
