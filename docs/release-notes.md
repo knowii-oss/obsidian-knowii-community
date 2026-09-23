@@ -1,5 +1,11 @@
 # Release Notes
 
+## 1.3.0 (2026-09-23)
+
+### Features
+
+- save to vault, ask the community, reply, events and instant notifications
+
 ## 1.2.0 (2026-09-23)
 
 ### Features
