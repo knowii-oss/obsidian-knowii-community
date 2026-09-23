@@ -254,8 +254,8 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                             const member = this.plugin.activityState?.member?.name
                             setting.setDesc(
                                 session
-                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in this plugin's settings (data.json) since ${new Date(session.savedAt).toLocaleString()}, so every device where this vault syncs gets notifications too. Anyone with a copy of this vault's .obsidian folder can use it: never share that folder. Signing out of Knowii removes it.`
-                                    : 'No sign-in stored. Sign in once in the Knowii pane on a desktop: the session is then stored in this plugin settings and reaches your other devices with the vault.'
+                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in this vault's plugin settings (data.json) since ${new Date(session.savedAt).toLocaleString()}, so every device where this vault syncs gets notifications too. Other vaults never get it: each vault signs in on its own. Anyone with a copy of this vault's .obsidian folder can use it: never share that folder. Signing out of Knowii removes it.`
+                                    : "No sign-in stored for this vault. Sign in once in the Knowii pane on a desktop: the session is then stored in this vault's plugin settings and reaches your other devices with the vault. Other vaults never get it."
                             )
                             if (session) {
                                 setting.addButton((button) =>

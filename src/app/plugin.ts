@@ -37,7 +37,9 @@ import {
     ElectronSessionTransport,
     HiddenWebviewTransport,
     StoredCookiesTransport,
-    findElectronSession
+    communityPartition,
+    findElectronSession,
+    vaultId
 } from './services/community-transport'
 import type { CommunityTransport } from './services/community-transport'
 import { CommunityClient } from './services/community-client'
@@ -108,6 +110,8 @@ export class KnowiiCommunityPlugin extends Plugin {
     private inbox: ActivityInbox | null = null
     /** The stored session is put back in the pane's jar at most once per run. */
     private sessionRestoreAttempted = false
+    /** This vault's cookie partition; never shared with another vault. */
+    private partition = communityPartition('')
 
     /**
      * Executed as soon as the plugin loads
@@ -119,6 +123,7 @@ export class KnowiiCommunityPlugin extends Plugin {
         await this.loadSettings()
 
         addIcon(KNOWII_ICON_ID, KNOWII_ICON_SVG)
+        this.partition = communityPartition(vaultId(this.app))
         this.setupActivity()
         // The stored session signs the pane in before it can show anything.
         await this.restoreSessionAtStartup()
@@ -149,7 +154,7 @@ export class KnowiiCommunityPlugin extends Plugin {
     // -----------------------------------------------------------------------
 
     private setupActivity(): void {
-        const electronSession = findElectronSession()
+        const electronSession = findElectronSession(this.partition)
         this.electronTransport = electronSession
             ? new ElectronSessionTransport(electronSession)
             : null
@@ -184,6 +189,7 @@ export class KnowiiCommunityPlugin extends Plugin {
         if (Platform.isDesktopApp) {
             this.realtime = new RealtimeLink({
                 baseUrl: () => this.settings.communityUrl,
+                partition: this.partition,
                 onActivity: () => {
                     this.watcher?.checkSoon(1500)
                 },
@@ -513,7 +519,7 @@ export class KnowiiCommunityPlugin extends Plugin {
         if (this.electronTransport) {
             list.push(this.electronTransport)
         } else if (Platform.isDesktopApp) {
-            this.webviewTransport ??= new HiddenWebviewTransport()
+            this.webviewTransport ??= new HiddenWebviewTransport(this.partition)
             list.push(this.webviewTransport)
         }
         if (this.storedTransport) {
@@ -976,6 +982,7 @@ export class KnowiiCommunityPlugin extends Plugin {
     /** What the pane may ask of the plugin (see `CommunityViewHost`). */
     private readonly viewHost: CommunityViewHost = {
         getSettings: () => this.settings,
+        partition: () => this.partition,
         loadLastUrl: () => {
             const value: unknown = this.app.loadLocalStorage(LAST_URL_KEY)
             return 'string' === typeof value ? value : null

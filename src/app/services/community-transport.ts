@@ -2,8 +2,28 @@ import { requestUrl } from 'obsidian'
 import type { StoredCookie } from '../domain/session-cookies'
 import { cookieHeader, splitSetCookieHeader } from '../domain/session-cookies'
 
-/** The pane's cookie partition. Everything signed-in goes through it. */
-export const COMMUNITY_PARTITION = 'persist:knowii-community'
+/**
+ * The pane's cookie partition for one vault. Everything signed-in goes
+ * through it. Electron partitions are shared by every vault the app opens, so
+ * the vault's id is part of the name: a vault never sees (nor stores in its
+ * settings) a session signed in from another vault.
+ */
+export function communityPartition(vaultId: string): string {
+    const id = vaultId
+        .toLowerCase()
+        .replace(/[^a-z0-9-]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+    return `persist:knowii-community-${id || 'vault'}`
+}
+
+/**
+ * A stable id for the open vault: Obsidian's own per-vault id (`app.appId`,
+ * not in the public typings), else the vault's name.
+ */
+export function vaultId(app: { vault: { getName(): string } }): string {
+    const appId = (app as { appId?: unknown }).appId
+    return 'string' === typeof appId && '' !== appId ? appId : app.vault.getName()
+}
 
 /** What a transport hands back: the status and the parsed body. */
 export interface TransportResponse {
@@ -103,7 +123,7 @@ interface ElectronSession {
  * The pane's session through Electron's `remote` module. Null when the
  * runtime does not expose it (mobile, or a future Obsidian without `remote`).
  */
-export function findElectronSession(partition = COMMUNITY_PARTITION): ElectronSession | null {
+export function findElectronSession(partition: string): ElectronSession | null {
     try {
         const nodeRequire = (window as unknown as { require?: (id: string) => unknown }).require
         const electron = nodeRequire?.('electron') as
@@ -220,6 +240,8 @@ const LOAD_TIMEOUT_MS = 30_000
  * from there with the member's cookies.
  */
 export class HiddenWebviewTransport implements CommunityTransport {
+    constructor(private readonly partition: string) {}
+
     readonly id = 'hidden-webview' as const
 
     private container: HTMLElement | null = null
@@ -284,7 +306,7 @@ export class HiddenWebviewTransport implements CommunityTransport {
             const container = document.body.createDiv({ cls: 'knowii-community-hidden-host' })
             container.setAttribute('aria-hidden', 'true')
             const element = container.createEl('webview' as keyof HTMLElementTagNameMap)
-            element.setAttribute('partition', COMMUNITY_PARTITION)
+            element.setAttribute('partition', this.partition)
             element.setAttribute('src', joinUrl(baseUrl, ANCHOR_PATH))
             const webview = element as unknown as HiddenWebview
             this.container = container

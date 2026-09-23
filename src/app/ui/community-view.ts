@@ -51,6 +51,8 @@ const ERR_ABORTED = -3
  */
 export interface CommunityViewHost {
     getSettings(): PluginSettings
+    /** The vault's cookie partition (see `communityPartition`). */
+    partition(): string
     loadLastUrl(): string | null
     saveLastUrl(url: string): void
     hasSeenWelcome(): boolean
@@ -421,9 +423,9 @@ export class KnowiiCommunityView extends ItemView {
             cls: `${CLS}-webview`
         })
         const webview = element as unknown as WebviewElement
-        // One partition for the whole plugin: the member's session survives
-        // reopening the pane and restarting the app.
-        element.setAttribute('partition', 'persist:knowii-community')
+        // One partition per vault: the member's session survives reopening the
+        // pane and restarting the app, and never leaks into another vault.
+        element.setAttribute('partition', this.host.partition())
         // Links that ask for a new window (file previews, external sites) get
         // one instead of being silently dropped.
         element.setAttribute('allowpopups', '')

@@ -1,5 +1,4 @@
 import type { RealtimeEndpoint } from '../domain/community-provider'
-import { COMMUNITY_PARTITION } from './community-transport'
 import { log } from '../../utils/log'
 
 /** Prefix of the console lines the in-page script uses to talk to the plugin. */
@@ -11,6 +10,8 @@ export type RealtimeStatus = 'off' | 'connecting' | 'live'
 
 export interface RealtimeHost {
     baseUrl(): string
+    /** The vault's cookie partition (see `communityPartition`). */
+    partition: string
     /** Something happened in the community: check now. */
     onActivity(): void
     onStatus(status: RealtimeStatus): void
@@ -86,7 +87,7 @@ export class RealtimeLink {
         const container = document.body.createDiv({ cls: 'knowii-community-hidden-host' })
         container.setAttribute('aria-hidden', 'true')
         const element = container.createEl('webview' as keyof HTMLElementTagNameMap)
-        element.setAttribute('partition', COMMUNITY_PARTITION)
+        element.setAttribute('partition', this.host.partition)
         element.setAttribute('src', `${this.host.baseUrl().replace(/\/+$/, '')}${ANCHOR_PATH}`)
         const webview = element as unknown as Webview
         this.container = container
