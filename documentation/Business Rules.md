@@ -4,13 +4,17 @@ This document defines the core business rules. These rules MUST be respected in 
 
 ---
 
-## Hosted, not reimplemented
+## One session, stored in the plugin settings
 
-The plugin shows the community as the community serves it. It never scrapes, proxies or calls the community's internal endpoints, and it never reads the member's session. When the community moves, only the base URL changes.
+The pane uses a persistent partition dedicated to the plugin (`persist:knowii-community`) so the member signs in once. The session cookies of that partition are also persisted in the plugin settings (`data.json`, field `session`): other devices where the vault syncs use them to check for activity, and a desktop without a session gets it restored into the partition. The user documentation says so plainly.
 
-## One session, on this device
+## Never sign the member back in behind their back
 
-The webview uses a persistent partition dedicated to the plugin so the member signs in once per device. Session data never enters `data.json` or the vault.
+A stored session is put back into the pane only when the pane has none at the start of a run. If the member was signed in during this run and is now signed out, they signed out (or the session ended): the stored session is dropped, never restored.
+
+## Notifications never block or flood
+
+Checks only read (GET); nothing is marked as read by the plugin. The first check on a device announces the backlog as one summary; afterwards at most three items get their own alert per check, the rest fold into one. Failures back off (doubling, capped at 15 minutes) and never stop the checks; transports fall through in order (Electron session, hidden webview, stored cookies).
 
 ## The pane never blocks the user
 

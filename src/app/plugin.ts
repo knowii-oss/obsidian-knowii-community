@@ -1,23 +1,76 @@
-import { Plugin, addIcon } from 'obsidian'
+import { Menu, Notice, Platform, Plugin, addIcon } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
-import { DEFAULT_SETTINGS, isPaneLocation, isValidZoomPercent } from './types/plugin-settings.intf'
+import {
+    DEFAULT_SETTINGS,
+    isCheckInterval,
+    isPaneLocation,
+    isValidZoomPercent,
+    parseNotifyCategories,
+    parseSpaceIds
+} from './types/plugin-settings.intf'
 import type { PluginSettings } from './types/plugin-settings.intf'
 import { KnowiiCommunitySettingTab } from './settings/settings-tab'
 import { log } from '../utils/log'
 import { registerWhatsNewView } from './whats-new'
-import { produce } from 'immer'
+import { castDraft, produce } from 'immer'
 import type { Draft } from 'immer'
 import { KNOWII_ICON_ID, KNOWII_ICON_SVG } from './assets/knowii-icon'
 import { COMMUNITY_VIEW_TYPE, KnowiiCommunityView } from './ui/community-view'
 import type { CommunityViewHost } from './ui/community-view'
 import {
+    ADMIN_DESTINATIONS,
     COMMUNITY_DESTINATIONS,
     buildCommunityUrl,
     normalizeCommunityUrl
 } from './domain/community-links'
+import type { ActivityItem } from './domain/community-activity'
+import { totalUnread } from './domain/community-activity'
+import type { StoredSession } from './domain/session-cookies'
+import {
+    applySetCookies,
+    authFingerprint,
+    hasAuthCookie,
+    parseStoredSession
+} from './domain/session-cookies'
+import {
+    ElectronSessionTransport,
+    HiddenWebviewTransport,
+    StoredCookiesTransport,
+    findElectronSession
+} from './services/community-transport'
+import type { CommunityTransport } from './services/community-transport'
+import { CommunityClient } from './services/community-client'
+import type { ActivityResult } from './services/community-client'
+import { ActivityWatcher, INITIAL_WATCH_STATE } from './services/activity-watcher'
+import type { WatchState } from './services/activity-watcher'
+import { announceBacklog, announceItems, showPlainNotice } from './ui/activity-alerts'
+import type { AlertOptions } from './ui/activity-alerts'
+import { StatusBarBadge, renderRibbonBadge } from './ui/activity-indicators'
+import { ActivityModal } from './ui/activity-modal'
+import { fillActivityMenu } from './ui/activity-menu'
+import { confirmAction } from './ui/confirm-modal'
+import { ActivityInbox } from './services/activity-inbox'
+import type { ActivityListController } from './ui/activity-modal'
+import type { WatchableSpace } from './domain/community-watch'
 
 const LAST_URL_KEY = 'knowii-community:last-url'
 const WELCOME_SEEN_KEY = 'knowii-community:welcome-seen'
+/** Per device: which items the member has already been told about. */
+const SEEN_KEYS_KEY = 'knowii-community:seen-activity'
+/** Per device: when watching the whole community started (nothing older is announced). */
+const WATCH_SINCE_KEY = 'knowii-community:watch-since'
+/** A list older than this is refreshed before it is shown. */
+const LIST_MAX_AGE_MS = 30_000
+/** After moving around in the pane, give the community time to mark things read. */
+const AFTER_NAVIGATION_DELAY_MS = 5_000
+
+/** Settings that change what the pane shows; anything else leaves it alone. */
+const PANE_SETTING_KEYS = [
+    'communityUrl',
+    'showToolbar',
+    'rememberLastPage',
+    'zoomPercent'
+] as const satisfies readonly (keyof PluginSettings)[]
 
 export class KnowiiCommunityPlugin extends Plugin {
     /**
@@ -26,6 +79,19 @@ export class KnowiiCommunityPlugin extends Plugin {
     override settings: PluginSettings = produce(DEFAULT_SETTINGS, () => DEFAULT_SETTINGS)
 
     private ribbonIconEl: HTMLElement | null = null
+
+    private statusBar: StatusBarBadge | null = null
+    private electronTransport: ElectronSessionTransport | null = null
+    private webviewTransport: HiddenWebviewTransport | null = null
+    private storedTransport: StoredCookiesTransport | null = null
+    private watcher: ActivityWatcher | null = null
+    private client: CommunityClient | null = null
+    private settingTab: KnowiiCommunitySettingTab | null = null
+    /** Spaces listed in the settings; the tab is rebuilt when this changes. */
+    private listedSpaceIds = ''
+    private inbox: ActivityInbox | null = null
+    /** The stored session is put back in the pane's jar at most once per run. */
+    private sessionRestoreAttempted = false
 
     /**
      * Executed as soon as the plugin loads
@@ -44,11 +110,574 @@ export class KnowiiCommunityPlugin extends Plugin {
 
         this.registerCommands()
         this.applyRibbonSetting()
+        this.setupActivity()
 
-        this.addSettingTab(new KnowiiCommunitySettingTab(this.app, this))
+        this.settingTab = new KnowiiCommunitySettingTab(this.app, this)
+        this.addSettingTab(this.settingTab)
     }
 
     override onunload() {}
+
+    /** `data.json` changed on disk (vault sync): pick up a session from another device. */
+    override async onExternalSettingsChange(): Promise<void> {
+        const previous = this.settings
+        await this.loadSettings()
+        this.applySettings(previous)
+    }
+
+    // -----------------------------------------------------------------------
+    // Activity: background checks, alerts, badges
+    // -----------------------------------------------------------------------
+
+    private setupActivity(): void {
+        const electronSession = findElectronSession()
+        this.electronTransport = electronSession
+            ? new ElectronSessionTransport(electronSession)
+            : null
+        this.storedTransport = new StoredCookiesTransport(
+            () => this.settings.session?.cookies ?? null
+        )
+
+        const inbox = new ActivityInbox({
+            load: (key) => this.app.loadLocalStorage(key) as unknown,
+            save: (key, value) => {
+                this.app.saveLocalStorage(key, value)
+            }
+        })
+        this.inbox = inbox
+
+        const client = new CommunityClient({
+            baseUrl: () => this.settings.communityUrl,
+            watchOptions: () =>
+                this.settings.watchWholeCommunity
+                    ? {
+                          since: this.watchSince(),
+                          mutedSpaceIds: new Set(this.settings.mutedSpaceIds)
+                      }
+                    : null,
+            transports: () => this.transports(),
+            onSetCookies: (headers) => {
+                this.onSetCookies(headers)
+            }
+        })
+
+        this.client = client
+        this.watcher = new ActivityWatcher(client, {
+            decorate: (snapshot) => inbox.merge(snapshot.items, snapshot.unreadRoomUuids),
+            intervalMs: () => this.settings.checkIntervalSeconds * 1000,
+            loadSeen: () => {
+                const value: unknown = this.app.loadLocalStorage(SEEN_KEYS_KEY)
+                return Array.isArray(value)
+                    ? {
+                          keys: value.filter((key): key is string => 'string' === typeof key),
+                          initialized: true
+                      }
+                    : { keys: [], initialized: false }
+            },
+            saveSeen: (keys) => {
+                this.app.saveLocalStorage(SEEN_KEYS_KEY, [...keys])
+            },
+            onState: (state) => {
+                this.renderActivity(state)
+                this.refreshSpaceSettings()
+            },
+            onNewItems: (items, initial) => {
+                this.announce(items, initial)
+            },
+            onSignedOut: () => {
+                if (this.settings.notificationsEnabled && this.settings.showNotices) {
+                    showPlainNotice(
+                        'You were signed out of Knowii. Click to sign in again.',
+                        () => {
+                            void this.activateView()
+                        }
+                    )
+                }
+            },
+            afterCheck: (result) => this.keepSession(result)
+        })
+
+        if (Platform.isDesktopApp) {
+            this.statusBar = new StatusBarBadge(this.addStatusBarItem(), () => {
+                void this.showActivityList()
+            })
+        }
+
+        this.register(() => {
+            this.watcher?.stop()
+            this.webviewTransport?.dispose()
+        })
+        // Catch up as soon as the member comes back or the network returns.
+        this.registerDomEvent(window, 'focus', () => {
+            if (this.watcher?.isRunning) {
+                this.watcher.checkIfStale((this.settings.checkIntervalSeconds * 1000) / 2)
+            }
+        })
+        this.registerDomEvent(window, 'online', () => {
+            if (this.watcher?.isRunning) {
+                this.watcher.checkSoon()
+            }
+        })
+
+        this.app.workspace.onLayoutReady(() => {
+            this.applyActivitySettings()
+        })
+    }
+
+    /**
+     * Ways to reach the community on this device, best first. The pane's own
+     * cookie jar through Electron when available; a hidden webview on the same
+     * partition otherwise; the session stored in the settings everywhere
+     * (the only way on mobile).
+     */
+    private transports(): CommunityTransport[] {
+        const list: CommunityTransport[] = []
+        if (this.electronTransport) {
+            list.push(this.electronTransport)
+        } else if (Platform.isDesktopApp) {
+            this.webviewTransport ??= new HiddenWebviewTransport()
+            list.push(this.webviewTransport)
+        }
+        if (this.storedTransport) {
+            list.push(this.storedTransport)
+        }
+        return list
+    }
+
+    /** Start or stop the background checks and redraw the badges. */
+    private applyActivitySettings(): void {
+        const watcher = this.watcher
+        if (!watcher) {
+            return
+        }
+        if (this.settings.notificationsEnabled) {
+            watcher.start()
+            watcher.reschedule()
+        } else {
+            watcher.stop()
+        }
+        this.renderActivity(watcher.current)
+    }
+
+    private renderActivity(state: WatchState): void {
+        const enabled = this.settings.notificationsEnabled
+        this.statusBar?.render(state, enabled && this.settings.showStatusBarBadge)
+        renderRibbonBadge(this.ribbonIconEl, state, enabled && this.settings.showRibbonBadge)
+        const unread = 'signed-in' === state.status ? totalUnread(state.counts) : 0
+        const isAdmin = true === state.member?.isAdmin
+        for (const leaf of this.app.workspace.getLeavesOfType(COMMUNITY_VIEW_TYPE)) {
+            if (leaf.view instanceof KnowiiCommunityView) {
+                leaf.view.updateActivity(unread, isAdmin)
+            }
+        }
+    }
+
+    /** Check right away and say what was found. */
+    private async checkNow(): Promise<void> {
+        const state = await this.watcher?.check()
+        if (!state) {
+            return
+        }
+        if ('signed-in' === state.status) {
+            const { notifications, messages, threads } = state.counts
+            new Notice(
+                `Knowii: ${notifications} unread notifications, ${messages} unread conversations, ${threads} unread threads.`
+            )
+        } else if ('signed-out' === state.status) {
+            new Notice('Knowii: you are not signed in.')
+        } else {
+            new Notice(`Knowii cannot be reached right now (${state.error ?? 'unknown error'}).`)
+        }
+    }
+
+    /** Right-click on the ribbon icon: unread items, show all, check now, admin pages. */
+    private showRibbonMenu(event: MouseEvent): void {
+        event.preventDefault()
+        const menu = new Menu()
+        fillActivityMenu(menu, this.watcher?.current ?? INITIAL_WATCH_STATE, ADMIN_DESTINATIONS, {
+            openItem: (item) => {
+                this.openItem(item)
+            },
+            showAll: () => {
+                void this.showActivityList()
+            },
+            checkNow: () => {
+                void this.checkNow()
+            },
+            openPath: (path) => {
+                void this.activateView(path)
+            },
+            markAllRead: () => {
+                void this.markAllRead()
+            },
+            archiveRead: () => {
+                void this.archiveRead()
+            }
+        })
+        menu.showAtMouseEvent(event)
+    }
+
+    private alertOptions(): AlertOptions {
+        return {
+            notices: this.settings.showNotices,
+            desktop: this.settings.showDesktopNotifications,
+            open: (item) => {
+                this.openItem(item)
+            },
+            openList: () => {
+                void this.showActivityList()
+            }
+        }
+    }
+
+    private announce(items: readonly ActivityItem[], initial: boolean): void {
+        if (!this.settings.notificationsEnabled) {
+            return
+        }
+        const wanted = items.filter((item) => this.settings.notifyCategories[item.category])
+        if (initial) {
+            announceBacklog(wanted.length, this.alertOptions())
+        } else {
+            announceItems(wanted, this.alertOptions())
+        }
+    }
+
+    /** Open an item: in the pane on desktop, in the browser on mobile. */
+    private openItem(item: ActivityItem): void {
+        // Opening is reading, as in a mail client.
+        if (item.unread) {
+            void this.markItemsRead([item], { quiet: true })
+        }
+        if (Platform.isDesktopApp) {
+            void this.activateView(item.path)
+            return
+        }
+        window.open(buildCommunityUrl(this.settings.communityUrl, item.path))
+    }
+
+    /** The "what's new" list: refreshed when stale, then shown. */
+    async showActivityList(): Promise<void> {
+        const watcher = this.watcher
+        if (!watcher) {
+            return
+        }
+        let state = watcher.current
+        const fresh =
+            'signed-in' === state.status &&
+            null !== state.checkedAt &&
+            Date.now() - state.checkedAt < LIST_MAX_AGE_MS
+        if (!fresh) {
+            const checking = new Notice('Checking Knowii…', 0)
+            try {
+                state = await watcher.check()
+            } finally {
+                checking.hide()
+            }
+        }
+        switch (state.status) {
+            case 'signed-in':
+                if (0 === state.items.length) {
+                    new Notice("You're all caught up in Knowii.")
+                    return
+                }
+                new ActivityModal(this.app, this.listController()).open()
+                return
+            case 'signed-out':
+                if (Platform.isDesktopApp) {
+                    new Notice('Sign in to Knowii to see what is new.')
+                    void this.activateView()
+                } else {
+                    new Notice(
+                        'Sign in to Knowii in the Obsidian desktop app once: the session then reaches this device with your vault.'
+                    )
+                }
+                return
+            case 'error':
+            case 'starting':
+                new Notice(
+                    `Knowii cannot be reached right now (${state.error ?? 'unknown error'}).`
+                )
+                return
+        }
+    }
+
+    /**
+     * Keeps the stored session in step with the pane's cookie jar (desktop),
+     * and puts it back in the jar when this device has none.
+     */
+    private async keepSession(result: ActivityResult): Promise<void> {
+        const electron = this.electronTransport
+        const transport =
+            'signed-in' === result.status ? result.snapshot.transport : result.transport
+        if (!electron || 'electron-session' !== transport) {
+            return
+        }
+        const base = this.settings.communityUrl
+        if ('signed-in' === result.status) {
+            const cookies = await electron.readCookies(base)
+            if (!hasAuthCookie(cookies)) {
+                return
+            }
+            const stored = this.settings.session
+            if (!stored || authFingerprint(stored.cookies) !== authFingerprint(cookies)) {
+                await this.saveSession({ cookies, savedAt: new Date().toISOString() })
+            }
+            return
+        }
+        // Signed out in the pane.
+        const stored = this.settings.session
+        if (!stored) {
+            return
+        }
+        // Signed in earlier in this run, signed out now: the member signed
+        // out (or the session ended). Never sign them back in behind their back.
+        if ('signed-in' === this.watcher?.current.status) {
+            this.sessionRestoreAttempted = true
+            await this.saveSession(null)
+            return
+        }
+        if (!this.sessionRestoreAttempted) {
+            this.sessionRestoreAttempted = true
+            await electron.writeCookies(base, stored.cookies)
+            this.watcher?.checkSoon()
+            return
+        }
+        // The stored session did not work either: it is dead, forget it.
+        await this.saveSession(null)
+    }
+
+    /** Cookie updates from the community on the stored-session transport. */
+    private onSetCookies(headers: readonly string[]): void {
+        const stored = this.settings.session
+        if (!stored) {
+            return
+        }
+        const host = new URL(this.settings.communityUrl).host
+        const cookies = applySetCookies(stored.cookies, headers, host)
+        if (authFingerprint(cookies) === authFingerprint(stored.cookies)) {
+            return
+        }
+        void this.saveSession(
+            hasAuthCookie(cookies) ? { cookies, savedAt: new Date().toISOString() } : null
+        )
+    }
+
+    /** Stores (or forgets) the session without touching anything on screen. */
+    saveSession(session: StoredSession | null): Promise<void> {
+        return this.updateSettings(
+            (draft) => {
+                draft.session = castDraft(session)
+            },
+            { apply: false }
+        )
+    }
+
+    /** Forget the stored session (settings button). The pane's own sign-in is untouched. */
+    async forgetStoredSession(): Promise<void> {
+        await this.saveSession(null)
+        new Notice('The stored Knowii session was removed from the plugin settings.')
+    }
+
+    // -----------------------------------------------------------------------
+    // Read and archive
+    // -----------------------------------------------------------------------
+
+    /** When watching the whole community started on this device. */
+    private watchSince(): number {
+        const stored: unknown = this.app.loadLocalStorage(WATCH_SINCE_KEY)
+        if ('number' === typeof stored && Number.isFinite(stored)) {
+            return stored
+        }
+        return this.restartWatch()
+    }
+
+    /** Start watching from now (turning the watch on again never replays the past). */
+    restartWatch(): number {
+        const now = Date.now()
+        this.app.saveLocalStorage(WATCH_SINCE_KEY, now)
+        return now
+    }
+
+    /** The per-space switches follow the spaces the last check found. */
+    private refreshSpaceSettings(): void {
+        const ids = this.knownSpaces()
+            .map((space) => space.id)
+            .join(',')
+        if (ids !== this.listedSpaceIds) {
+            this.listedSpaceIds = ids
+            this.settingTab?.update()
+        }
+    }
+
+    /** Spaces known from the last check, for the per-space switches. */
+    knownSpaces(): readonly WatchableSpace[] {
+        return this.client?.knownSpaces() ?? []
+    }
+
+    private listController(): ActivityListController {
+        return {
+            items: () => this.watcher?.current.items ?? [],
+            open: (item) => {
+                this.openItem(item)
+            },
+            markRead: (item) => this.markItemsRead([item]),
+            archive: (item) => this.archiveItems([item]),
+            markAllRead: () => this.markAllRead(),
+            archiveRead: () => this.archiveRead()
+        }
+    }
+
+    /** Items sharing an item's conversation: reading one reads the room. */
+    private withSameRoom(items: readonly ActivityItem[]): ActivityItem[] {
+        const rooms = new Set(
+            items.flatMap((item) => ('room' === item.ref.kind ? [item.ref.uuid] : []))
+        )
+        const all = this.watcher?.current.items ?? []
+        const related = all.filter((item) => 'room' === item.ref.kind && rooms.has(item.ref.uuid))
+        return [...new Map([...items, ...related].map((item) => [item.key, item])).values()]
+    }
+
+    /** Distinct community-side targets of some items (a room once, not per message). */
+    private refsOf(items: readonly ActivityItem[]): ActivityItem['ref'][] {
+        const refs = new Map<string, ActivityItem['ref']>()
+        for (const item of items) {
+            const ref = item.ref
+            const id =
+                'room' === ref.kind
+                    ? `room:${ref.uuid}`
+                    : 'local' === ref.kind
+                      ? null
+                      : `${ref.kind}:${ref.id}`
+            if (id) {
+                refs.set(id, ref)
+            }
+        }
+        return [...refs.values()]
+    }
+
+    async markItemsRead(
+        items: readonly ActivityItem[],
+        options: { quiet?: boolean } = {}
+    ): Promise<void> {
+        const client = this.client
+        const inbox = this.inbox
+        if (!client || !inbox) {
+            return
+        }
+        const targets = this.withSameRoom(items)
+        const drop = this.unreadCountsOf(targets)
+        const failures = await this.forEachRef(this.refsOf(targets), (ref) => client.markRead(ref))
+        inbox.markRead(targets.map((item) => item.key))
+        this.watcher?.adjustCounts(drop)
+        this.afterInboxChange()
+        if (failures > 0 && !options.quiet) {
+            new Notice(
+                'Knowii: marked as read here, but the community could not be updated. It will catch up on the next check.'
+            )
+        }
+    }
+
+    async archiveItems(items: readonly ActivityItem[]): Promise<void> {
+        const client = this.client
+        const inbox = this.inbox
+        if (!client || !inbox) {
+            return
+        }
+        const targets = this.withSameRoom(items)
+        const drop = this.unreadCountsOf(targets)
+        const failures = await this.forEachRef(this.refsOf(targets), (ref) => client.archive(ref))
+        inbox.archive(targets.map((item) => item.key))
+        this.watcher?.adjustCounts(drop)
+        this.afterInboxChange()
+        if (failures > 0) {
+            new Notice('Knowii: archived here, but the community could not be updated.')
+        }
+    }
+
+    /** Everything read, here and on the community (asks first). */
+    async markAllRead(): Promise<void> {
+        const client = this.client
+        const inbox = this.inbox
+        if (!client || !inbox) {
+            return
+        }
+        const confirmed = await confirmAction(this.app, {
+            title: 'Mark everything as read?',
+            text: 'All your Knowii notifications, conversations and threads will be marked as read, on Knowii too.',
+            confirm: 'Mark all as read'
+        })
+        if (!confirmed) {
+            return
+        }
+        try {
+            await client.markAllRead()
+        } catch (error: unknown) {
+            new Notice(
+                `Knowii: the community could not be updated (${error instanceof Error ? error.message : String(error)}).`
+            )
+        }
+        inbox.markRead((this.watcher?.current.items ?? []).map((item) => item.key))
+        this.watcher?.adjustCounts(this.watcher.current.counts)
+        this.afterInboxChange()
+    }
+
+    /** Hides everything already read from the list; read notifications are archived on the community. */
+    async archiveRead(): Promise<void> {
+        const read = (this.watcher?.current.items ?? []).filter((item) => !item.unread)
+        if (0 === read.length) {
+            new Notice('Knowii: nothing read to archive.')
+            return
+        }
+        await this.archiveItems(read)
+    }
+
+    /**
+     * How much the unread counts drop when these items are read: one per
+     * unread notification, conversation (once per room) and thread. Local
+     * items are not counted by the community, so they change nothing.
+     */
+    private unreadCountsOf(items: readonly ActivityItem[]): {
+        notifications: number
+        messages: number
+        threads: number
+    } {
+        const unread = items.filter((item) => item.unread)
+        const rooms = new Set(
+            unread.flatMap((item) => ('room' === item.ref.kind ? [item.ref.uuid] : []))
+        )
+        return {
+            notifications: unread.filter((item) => 'notification' === item.ref.kind).length,
+            messages: rooms.size,
+            threads: unread.filter((item) => 'thread' === item.ref.kind).length
+        }
+    }
+
+    /** Runs a community write per target, one at a time; returns how many failed. */
+    private async forEachRef(
+        refs: readonly ActivityItem['ref'][],
+        write: (ref: ActivityItem['ref']) => Promise<void>
+    ): Promise<number> {
+        let failures = 0
+        for (const ref of refs) {
+            try {
+                await write(ref)
+            } catch {
+                failures += 1
+            }
+        }
+        return failures
+    }
+
+    /** Local state changed: redraw now, confirm with the community shortly. */
+    private afterInboxChange(): void {
+        this.watcher?.refreshView()
+        this.watcher?.checkSoon()
+    }
+
+    /** Latest known state, for the settings tab. */
+    get activityState(): WatchState | null {
+        return this.watcher?.current ?? null
+    }
 
     /** What the pane may ask of the plugin (see `CommunityViewHost`). */
     private readonly viewHost: CommunityViewHost = {
@@ -66,6 +695,20 @@ export class KnowiiCommunityPlugin extends Plugin {
         },
         openExternal: (url) => {
             window.open(url)
+        },
+        onNavigated: () => {
+            // With background checks off, still learn the role and counts once.
+            if (this.watcher?.isRunning || 'starting' === this.watcher?.current.status) {
+                this.watcher.checkSoon(AFTER_NAVIGATION_DELAY_MS)
+            }
+        },
+        isAdmin: () => true === this.watcher?.current.member?.isAdmin,
+        unreadCount: () => {
+            const state = this.watcher?.current
+            return state && 'signed-in' === state.status ? totalUnread(state.counts) : 0
+        },
+        showActivity: () => {
+            void this.showActivityList()
         }
     }
 
@@ -84,6 +727,55 @@ export class KnowiiCommunityPlugin extends Plugin {
                 name: `Open Knowii: ${destination.label.toLowerCase()}`,
                 callback: () => {
                     void this.activateView(destination.path)
+                }
+            })
+        }
+
+        this.addCommand({
+            id: 'show-activity',
+            name: "Show what's new in Knowii",
+            callback: () => {
+                void this.showActivityList()
+            }
+        })
+
+        this.addCommand({
+            id: 'check-activity',
+            name: 'Check Knowii for new activity now',
+            callback: () => {
+                void this.checkNow()
+            }
+        })
+
+        this.addCommand({
+            id: 'mark-all-read',
+            name: 'Mark everything in Knowii as read',
+            callback: () => {
+                void this.markAllRead()
+            }
+        })
+
+        this.addCommand({
+            id: 'archive-read',
+            name: 'Archive what is read in Knowii',
+            callback: () => {
+                void this.archiveRead()
+            }
+        })
+
+        // Admin pages: available once a check has confirmed the admin role.
+        for (const destination of ADMIN_DESTINATIONS) {
+            this.addCommand({
+                id: `open-${destination.id}`,
+                name: `Open Knowii admin: ${destination.label.toLowerCase()}`,
+                checkCallback: (checking) => {
+                    if (true !== this.watcher?.current.member?.isAdmin) {
+                        return false
+                    }
+                    if (!checking) {
+                        void this.activateView(destination.path)
+                    }
+                    return true
                 }
             })
         }
@@ -162,15 +854,34 @@ export class KnowiiCommunityPlugin extends Plugin {
             this.ribbonIconEl = this.addRibbonIcon(KNOWII_ICON_ID, 'Open Knowii', () => {
                 void this.activateView()
             })
+            // The element goes away with the icon, and its listener with it.
+            this.ribbonIconEl.addEventListener('contextmenu', (event) => {
+                this.showRibbonMenu(event)
+            })
+            if (this.watcher) {
+                this.renderActivity(this.watcher.current)
+            }
         } else if (!this.settings.showRibbonIcon && this.ribbonIconEl) {
             this.ribbonIconEl.remove()
             this.ribbonIconEl = null
         }
     }
 
-    /** Push a settings change to everything already on screen. */
-    private applySettings(): void {
+    /**
+     * Push a settings change to everything already on screen. The pane is
+     * only re-rendered when a pane setting changed: re-rendering reloads the
+     * community.
+     */
+    private applySettings(previous: PluginSettings): void {
         this.applyRibbonSetting()
+        this.applyActivitySettings()
+        if (previous.communityUrl !== this.settings.communityUrl) {
+            this.watcher?.checkSoon()
+        }
+        const paneChanged = PANE_SETTING_KEYS.some((key) => previous[key] !== this.settings[key])
+        if (!paneChanged) {
+            return
+        }
         for (const leaf of this.app.workspace.getLeavesOfType(COMMUNITY_VIEW_TYPE)) {
             if (leaf.view instanceof KnowiiCommunityView) {
                 leaf.view.refresh()
@@ -232,6 +943,47 @@ export class KnowiiCommunityPlugin extends Plugin {
             } else {
                 needToSaveSettings = true
             }
+            for (const key of [
+                'notificationsEnabled',
+                'showNotices',
+                'showDesktopNotifications',
+                'showStatusBarBadge',
+                'showRibbonBadge'
+            ] as const) {
+                const value = data[key]
+                if ('boolean' === typeof value) {
+                    draft[key] = value
+                } else {
+                    needToSaveSettings = true
+                }
+            }
+            if (isCheckInterval(data.checkIntervalSeconds)) {
+                draft.checkIntervalSeconds = data.checkIntervalSeconds
+            } else {
+                needToSaveSettings = true
+            }
+            const categories = parseNotifyCategories(data.notifyCategories)
+            draft.notifyCategories = categories.categories
+            if (!categories.complete) {
+                needToSaveSettings = true
+            }
+            if ('boolean' === typeof data.watchWholeCommunity) {
+                draft.watchWholeCommunity = data.watchWholeCommunity
+            } else {
+                needToSaveSettings = true
+            }
+            const muted = parseSpaceIds(data.mutedSpaceIds)
+            if (muted) {
+                draft.mutedSpaceIds = muted
+            } else {
+                needToSaveSettings = true
+            }
+            // No session on disk is normal (signed out); only a broken one is rewritten.
+            const session = parseStoredSession(data.session)
+            draft.session = castDraft(session)
+            if (null === session && null !== data.session && undefined !== data.session) {
+                needToSaveSettings = true
+            }
         })
 
         log(`Settings loaded`, 'debug', this.settings)
@@ -249,15 +1001,21 @@ export class KnowiiCommunityPlugin extends Plugin {
      * The single write path — the declarative settings tab routes every
      * control edit through here so persistence happens in exactly one place.
      */
-    updateSettings(mutator: (draft: Draft<PluginSettings>) => void): Promise<void> {
+    updateSettings(
+        mutator: (draft: Draft<PluginSettings>) => void,
+        options: { apply?: boolean } = {}
+    ): Promise<void> {
         // Persist-then-commit: swap memory only after saveData() succeeds, so
         // a rejected write rolls the control back to the on-disk truth.
         // Chained so overlapping edits derive from the previous committed state.
         const write = this.settingsWriteChain.then(async () => {
+            const previous = this.settings
             const next = produce(this.settings, mutator)
             await this.saveData(next)
             this.settings = next
-            this.applySettings()
+            if (false !== options.apply) {
+                this.applySettings(previous)
+            }
         })
         this.settingsWriteChain = write.catch(() => undefined)
         return write

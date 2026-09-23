@@ -26,6 +26,22 @@ export const COMMUNITY_DESTINATIONS: readonly CommunityDestination[] = [
     { id: 'members', label: 'Members', path: '/members', icon: 'users' }
 ]
 
+/** Community administration pages, offered to admins only. */
+export const ADMIN_DESTINATIONS: readonly CommunityDestination[] = [
+    {
+        id: 'admin-dashboard',
+        label: 'Dashboard',
+        path: '/settings/dashboard',
+        icon: 'layout-dashboard'
+    },
+    {
+        id: 'admin-audience',
+        label: 'Audience',
+        path: '/settings/audience/manage',
+        icon: 'users-round'
+    }
+]
+
 /**
  * Turns what the user typed into a usable base URL: adds https when the
  * scheme is missing, drops trailing slashes, refuses anything that is not a

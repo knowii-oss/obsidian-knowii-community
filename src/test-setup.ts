@@ -34,6 +34,12 @@ void mock.module('obsidian', () => ({
         onOpen() {}
         onClose() {}
     },
+    SuggestModal: class SuggestModal {
+        setPlaceholder(_placeholder: string) {}
+        setInstructions(_instructions: unknown[]) {}
+        open() {}
+        close() {}
+    },
     FuzzySuggestModal: class FuzzySuggestModal {
         setPlaceholder(_placeholder: string) {}
         getItems(): unknown[] {
@@ -83,5 +89,6 @@ void mock.module('obsidian', () => ({
         arrayBuffer: new ArrayBuffer(0)
     }),
     debounce: (fn: (...args: unknown[]) => unknown) => fn,
-    setIcon: () => {}
+    setIcon: () => {},
+    setTooltip: () => {}
 }))

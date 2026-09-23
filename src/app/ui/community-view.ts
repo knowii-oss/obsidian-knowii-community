@@ -1,7 +1,8 @@
-import { ItemView, Platform, setIcon, setTooltip } from 'obsidian'
+import { ItemView, Menu, Platform, setIcon, setTooltip } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
 import { KNOWII_ICON_ID } from '../assets/knowii-icon'
 import {
+    ADMIN_DESTINATIONS,
     COMMUNITY_DESTINATIONS,
     KNOWII_JOIN_URL,
     buildCommunityUrl,
@@ -55,6 +56,14 @@ export interface CommunityViewHost {
     hasSeenWelcome(): boolean
     markWelcomeSeen(): void
     openExternal(url: string): void
+    /** The member moved around the community (reading may clear unread items). */
+    onNavigated(): void
+    /** Whether the signed-in member is a community admin (as last checked). */
+    isAdmin(): boolean
+    /** Unread total (as last checked). */
+    unreadCount(): number
+    /** Show the list of what is unread. */
+    showActivity(): void
 }
 
 /**
@@ -76,6 +85,8 @@ export class KnowiiCommunityView extends ItemView {
     private bodyEl: HTMLElement | null = null
     private backButton: HTMLElement | null = null
     private forwardButton: HTMLElement | null = null
+    private adminButton: HTMLElement | null = null
+    private activityBadge: HTMLElement | null = null
 
     constructor(leaf: WorkspaceLeaf, host: CommunityViewHost) {
         super(leaf)
@@ -105,6 +116,15 @@ export class KnowiiCommunityView extends ItemView {
     refresh(): void {
         const current = this.currentUrl()
         this.render(current)
+    }
+
+    /** Refresh the toolbar's activity bits: unread badge, admin menu. */
+    updateActivity(unread: number, isAdmin: boolean): void {
+        this.adminButton?.toggle(isAdmin)
+        if (this.activityBadge) {
+            this.activityBadge.toggle(unread > 0)
+            this.activityBadge.setText(unread > 99 ? '99+' : String(unread))
+        }
     }
 
     /** Navigate the hosted community to a path such as `/feed`. */
@@ -178,6 +198,8 @@ export class KnowiiCommunityView extends ItemView {
         this.bodyEl = null
         this.backButton = null
         this.forwardButton = null
+        this.adminButton = null
+        this.activityBadge = null
         this.contentEl.empty()
     }
 
@@ -215,6 +237,29 @@ export class KnowiiCommunityView extends ItemView {
         }
 
         const actions = toolbar.createDiv({ cls: `${CLS}-actions` })
+        const activityButton = this.toolbarButton(actions, 'inbox', "What's new", () => {
+            this.host.showActivity()
+        })
+        activityButton.addClass(`${CLS}-activity-button`)
+        this.activityBadge = activityButton.createSpan({ cls: `${CLS}-button-badge` })
+        const adminButton = this.toolbarButton(actions, 'shield', 'Admin', () => {})
+        // The menu needs the click position, which toolbarButton does not pass on.
+        adminButton.addEventListener('click', (event) => {
+            const menu = new Menu()
+            for (const destination of ADMIN_DESTINATIONS) {
+                menu.addItem((item) =>
+                    item
+                        .setTitle(destination.label)
+                        .setIcon(destination.icon)
+                        .onClick(() => {
+                            this.navigateTo(destination.path)
+                        })
+                )
+            }
+            menu.showAtMouseEvent(event)
+        })
+        this.adminButton = adminButton
+        this.updateActivity(this.host.unreadCount(), this.host.isAdmin())
         this.toolbarButton(actions, 'external-link', 'Open in browser', () => {
             this.openInBrowser()
         })
@@ -372,6 +417,7 @@ export class KnowiiCommunityView extends ItemView {
             if (current) {
                 this.host.saveLastUrl(current)
             }
+            this.host.onNavigated()
         }
         webview.addEventListener('did-navigate', onNavigate)
         webview.addEventListener('did-navigate-in-page', onNavigate)

@@ -1,0 +1,206 @@
+import { SuggestModal, setIcon, setTooltip } from 'obsidian'
+import type { App } from 'obsidian'
+import type { ActivityItem } from '../domain/community-activity'
+import { categoryInfo, formatAge } from '../domain/community-activity'
+
+const CLS = 'knowii-community'
+
+/** Filter token keeping unread items only, as in Gmail. */
+export const UNREAD_TOKEN = 'is:unread'
+
+/**
+ * Whether an item matches every word of the query (title, text, category).
+ * `is:unread` keeps unread items only.
+ */
+export function matchesQuery(item: ActivityItem, query: string): boolean {
+    const tokens = query.toLowerCase().split(/\s+/).filter(Boolean)
+    if (tokens.includes(UNREAD_TOKEN) && !item.unread) {
+        return false
+    }
+    const words = tokens.filter((token) => UNREAD_TOKEN !== token)
+    if (0 === words.length) {
+        return true
+    }
+    const haystack = [
+        item.title,
+        item.summary,
+        item.excerpt ?? '',
+        categoryInfo(item.category).label
+    ]
+        .join(' ')
+        .toLowerCase()
+    return words.every((word) => haystack.includes(word))
+}
+
+/** What the list can do; the plugin does the work and keeps the items current. */
+export interface ActivityListController {
+    items(): readonly ActivityItem[]
+    open(item: ActivityItem): void
+    markRead(item: ActivityItem): Promise<void>
+    archive(item: ActivityItem): Promise<void>
+    markAllRead(): Promise<void>
+    archiveRead(): Promise<void>
+}
+
+/** SuggestModal keeps its list behind `chooser`; typed as far as the list uses it. */
+interface Chooser {
+    selectedItem: number
+    values: ActivityItem[] | null
+    setSelectedItem(index: number, event?: unknown): void
+}
+
+/**
+ * Recent community activity, newest first, unread in bold (Gmail style),
+ * searchable. Enter opens (and marks read), Mod+Enter marks read, Alt+Enter
+ * archives; each row also has read and archive buttons.
+ */
+export class ActivityModal extends SuggestModal<ActivityItem> {
+    constructor(
+        app: App,
+        private readonly controller: ActivityListController
+    ) {
+        super(app)
+        this.limit = 300
+        this.emptyStateText = 'Nothing matches.'
+        this.updatePlaceholder()
+        this.setInstructions([
+            { command: '↑↓', purpose: 'to navigate' },
+            { command: '↵', purpose: 'to open' },
+            { command: 'mod ↵', purpose: 'to mark as read' },
+            { command: 'alt ↵', purpose: 'to archive' },
+            { command: 'esc', purpose: 'to dismiss' }
+        ])
+        this.modalEl.addClass(`${CLS}-activity-modal`)
+        this.renderToolbar()
+
+        this.scope.register(['Mod'], 'Enter', (event) => {
+            event.preventDefault()
+            const item = this.selected()
+            if (item) {
+                void this.run(() => this.controller.markRead(item))
+            }
+            return false
+        })
+        this.scope.register(['Alt'], 'Enter', (event) => {
+            event.preventDefault()
+            const item = this.selected()
+            if (item) {
+                void this.run(() => this.controller.archive(item))
+            }
+            return false
+        })
+    }
+
+    override getSuggestions(query: string): ActivityItem[] {
+        return this.controller.items().filter((item) => matchesQuery(item, query))
+    }
+
+    override renderSuggestion(item: ActivityItem, el: HTMLElement): void {
+        const info = categoryInfo(item.category)
+        el.addClass(`${CLS}-activity`)
+        el.toggleClass('is-unread', item.unread)
+        const icon = el.createSpan({ cls: `${CLS}-activity-icon` })
+        setIcon(icon, info.icon)
+        const body = el.createDiv({ cls: `${CLS}-activity-body` })
+        const head = body.createDiv({ cls: `${CLS}-activity-head` })
+        if (item.unread) {
+            head.createSpan({ cls: `${CLS}-activity-dot`, attr: { 'aria-label': 'Unread' } })
+        }
+        head.createSpan({ cls: `${CLS}-activity-title`, text: item.title })
+        head.createSpan({ cls: `${CLS}-activity-category`, text: info.label })
+        if (item.occurredAt > 0) {
+            head.createSpan({
+                cls: `${CLS}-activity-time`,
+                text: formatAge(item.occurredAt, Date.now())
+            })
+        }
+        body.createDiv({ cls: `${CLS}-activity-summary`, text: item.summary })
+        if (item.excerpt) {
+            body.createDiv({ cls: `${CLS}-activity-excerpt`, text: item.excerpt })
+        }
+
+        const actions = el.createDiv({ cls: `${CLS}-activity-actions` })
+        if (item.unread) {
+            this.rowButton(actions, 'check', 'Mark as read', () => this.controller.markRead(item))
+        }
+        this.rowButton(actions, 'archive', 'Archive', () => this.controller.archive(item))
+    }
+
+    override onChooseSuggestion(item: ActivityItem): void {
+        this.controller.open(item)
+    }
+
+    private renderToolbar(): void {
+        const bar = createDiv({ cls: `${CLS}-activity-toolbar` })
+        const markAll = bar.createEl('button', { text: 'Mark all as read' })
+        markAll.addEventListener('click', () => {
+            void this.run(() => this.controller.markAllRead())
+        })
+        const archiveRead = bar.createEl('button', { text: 'Archive read' })
+        setTooltip(archiveRead, 'Hide everything already read from this list')
+        archiveRead.addEventListener('click', () => {
+            void this.run(() => this.controller.archiveRead())
+        })
+        this.modalEl.insertBefore(bar, this.resultContainerEl)
+    }
+
+    private rowButton(
+        parent: HTMLElement,
+        icon: string,
+        label: string,
+        action: () => Promise<void>
+    ): void {
+        const button = parent.createEl('button', {
+            cls: `${CLS}-activity-action clickable-icon`,
+            attr: { 'aria-label': label, 'type': 'button' }
+        })
+        setIcon(button, icon)
+        setTooltip(button, label)
+        // Keep the row from being chosen (opened) and the input from losing focus.
+        button.addEventListener('mousedown', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+        })
+        button.addEventListener('click', (event) => {
+            event.preventDefault()
+            event.stopPropagation()
+            void this.run(action)
+        })
+    }
+
+    /** Runs an action, then redraws the list where the member was. */
+    private async run(action: () => Promise<void>): Promise<void> {
+        const index = this.suggestChooser()?.selectedItem ?? 0
+        await action()
+        this.updatePlaceholder()
+        this.inputEl.dispatchEvent(new Event('input'))
+        const after = this.suggestChooser()
+        const count = after?.values?.length ?? 0
+        if (after && count > 0) {
+            after.setSelectedItem(Math.min(index, count - 1))
+        }
+    }
+
+    private selected(): ActivityItem | null {
+        const chooser = this.suggestChooser()
+        return chooser?.values?.[chooser.selectedItem] ?? null
+    }
+
+    /**
+     * Obsidian's own list controller. Named apart from it on purpose: a method
+     * called `chooser` would be shadowed by the modal's `chooser` field.
+     */
+    private suggestChooser(): Chooser | null {
+        const chooser = (this as unknown as { chooser?: Chooser }).chooser
+        return chooser && 'number' === typeof chooser.selectedItem ? chooser : null
+    }
+
+    private updatePlaceholder(): void {
+        const unread = this.controller.items().filter((item) => item.unread).length
+        this.setPlaceholder(
+            0 === unread
+                ? "What's new in Knowii: you're all caught up. Type to filter."
+                : `What's new in Knowii: ${unread} unread. Type to filter, ${UNREAD_TOKEN} for unread only.`
+        )
+    }
+}

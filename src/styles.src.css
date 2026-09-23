@@ -229,3 +229,275 @@
     @apply m-0 text-xs;
     color: var(--text-faint);
 }
+
+/* ========================================
+   ACTIVITY: notices, status bar, ribbon
+   badge, "what's new" list
+   ======================================== */
+
+.knowii-community-notice {
+    display: flex;
+    gap: 0.6em;
+    align-items: flex-start;
+}
+
+.knowii-community-notice-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    color: var(--interactive-accent);
+}
+
+.knowii-community-notice-icon svg {
+    width: 1.1em;
+    height: 1.1em;
+}
+
+.knowii-community-notice-body {
+    min-width: 0;
+}
+
+.knowii-community-notice-title {
+    font-weight: var(--font-semibold);
+}
+
+.knowii-community-notice-summary {
+    color: var(--text-muted);
+}
+
+.knowii-community-notice-excerpt {
+    margin-top: 0.25em;
+    font-style: italic;
+    overflow-wrap: anywhere;
+}
+
+.knowii-community-notice-clickable {
+    cursor: pointer;
+}
+
+.knowii-community-status {
+    display: inline-flex;
+    gap: 0.5em;
+    align-items: center;
+}
+
+.knowii-community-status-mark,
+.knowii-community-status-icon {
+    display: inline-flex;
+}
+
+.knowii-community-status-mark svg,
+.knowii-community-status-icon svg {
+    width: 1em;
+    height: 1em;
+}
+
+.knowii-community-status-count {
+    display: inline-flex;
+    gap: 0.2em;
+    align-items: center;
+    color: var(--text-faint);
+}
+
+.knowii-community-status-count.is-unread {
+    color: var(--text-normal);
+    font-weight: var(--font-semibold);
+}
+
+.knowii-community-status-muted {
+    color: var(--text-faint);
+}
+
+/* The ribbon button carries the badge; it must be the positioning box. */
+.knowii-community-ribbon {
+    position: relative;
+}
+
+.knowii-community-ribbon-badge {
+    position: absolute;
+    top: 0;
+    right: 0;
+    min-width: 1.35em;
+    height: 1.35em;
+    padding: 0 0.3em;
+    border-radius: 999px;
+    background-color: #fd3585;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: var(--font-bold);
+    line-height: 1.35em;
+    text-align: center;
+    pointer-events: none;
+}
+
+.knowii-community-activity {
+    display: flex;
+    gap: 0.75em;
+    align-items: flex-start;
+}
+
+.knowii-community-activity-icon {
+    display: inline-flex;
+    flex-shrink: 0;
+    margin-top: 0.15em;
+    color: var(--interactive-accent);
+}
+
+.knowii-community-activity-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.knowii-community-activity-head {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5em;
+    align-items: baseline;
+}
+
+.knowii-community-activity-title {
+    font-weight: var(--font-semibold);
+}
+
+.knowii-community-activity-category {
+    padding: 0 0.45em;
+    border-radius: var(--radius-s, 4px);
+    background-color: var(--background-modifier-hover);
+    color: var(--text-muted);
+    font-size: var(--font-ui-smaller);
+}
+
+.knowii-community-activity-time {
+    margin-left: auto;
+    color: var(--text-faint);
+    font-size: var(--font-ui-smaller);
+}
+
+.knowii-community-activity-summary {
+    color: var(--text-muted);
+    font-size: var(--font-ui-small);
+}
+
+.knowii-community-activity-excerpt {
+    margin-top: 0.2em;
+    overflow: hidden;
+    color: var(--text-normal);
+    font-size: var(--font-ui-small);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+}
+
+/* The hidden webview used as a fallback transport: loaded, never seen. */
+.knowii-community-hidden-host {
+    position: fixed;
+    left: -10000px;
+    top: 0;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.knowii-community-hidden-host webview {
+    width: 1px;
+    height: 1px;
+}
+
+/* "What's new" toolbar button: unread badge over the icon. */
+.knowii-community-activity-button {
+    position: relative;
+}
+
+.knowii-community-button-badge {
+    position: absolute;
+    top: -2px;
+    right: -4px;
+    min-width: 1.35em;
+    height: 1.35em;
+    padding: 0 0.3em;
+    border-radius: 999px;
+    background-color: #fd3585;
+    color: #fff;
+    font-size: 0.6rem;
+    font-weight: var(--font-bold);
+    line-height: 1.35em;
+    text-align: center;
+    pointer-events: none;
+}
+
+/* "What's new" list, Gmail style: read items are quiet, unread ones bold. */
+.knowii-community-activity:not(.is-unread) .knowii-community-activity-title {
+    font-weight: var(--font-normal);
+    color: var(--text-muted);
+}
+
+.knowii-community-activity:not(.is-unread) .knowii-community-activity-excerpt {
+    color: var(--text-muted);
+}
+
+.knowii-community-activity.is-unread .knowii-community-activity-title,
+.knowii-community-activity.is-unread .knowii-community-activity-summary,
+.knowii-community-activity.is-unread .knowii-community-activity-time {
+    font-weight: var(--font-bold);
+    color: var(--text-normal);
+}
+
+.knowii-community-activity-dot {
+    align-self: center;
+    width: 0.5em;
+    height: 0.5em;
+    border-radius: 50%;
+    background-color: #fd3585;
+}
+
+/* "What's new" list: toolbar (mark all as read, archive read) and row actions. */
+.knowii-community-activity-toolbar {
+    display: flex;
+    gap: 0.5em;
+    justify-content: flex-end;
+    padding: 0.4em 0.75em;
+    border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.knowii-community-activity-toolbar button {
+    font-size: var(--font-ui-smaller);
+}
+
+.knowii-community-activity-actions {
+    display: flex;
+    flex-shrink: 0;
+    gap: 0.15em;
+    align-self: center;
+    opacity: 0;
+    transition: opacity 120ms ease-in-out;
+}
+
+.suggestion-item.is-selected .knowii-community-activity-actions,
+.suggestion-item:hover .knowii-community-activity-actions {
+    opacity: 1;
+}
+
+.knowii-community-activity-action {
+    padding: 0.25em;
+}
+
+/* Hand cursor on everything clickable in the plugin's own UI (Obsidian keeps
+   the arrow on most buttons). Disabled toolbar buttons keep the arrow. */
+.knowii-community-content button,
+.knowii-community-content a,
+.knowii-community-activity-modal button,
+.knowii-community-activity-modal .suggestion-item,
+.knowii-community-confirm button,
+.knowii-community-whats-new-view button,
+.knowii-community-whats-new-view a,
+.status-bar-item.knowii-community-status,
+.status-bar-item.knowii-community-status *,
+.knowii-community-ribbon,
+.knowii-community-notice-clickable {
+    cursor: pointer;
+}
+
+.knowii-community-content button.is-disabled,
+.knowii-community-content button:disabled {
+    cursor: default;
+}
