@@ -405,6 +405,22 @@ The version is derived from the conventional commits since the last tag
 (`bun scripts/calculate-next-version.ts --verbose` shows the analysis). Confirm it before
 using `--yes`: a stray `feat!` in the range turns a patch into a major.
 
+**Release notes are written, not generated, whenever users will read them.** The in-app
+"What's new" tab and the GitHub release body both show the release's `CHANGELOG.md`
+section, which by default is the conventional-changelog list of commit subjects
+("fix(build): align with the catalog reviewer's archive") — written for maintainers, not
+users. For any release a user should understand (a feature, a visible fix, a major that
+bundles earlier minors), write `NEXT_RELEASE.md` at the repo root and commit it before
+releasing: what changed for the user, in plain language, with `###` or deeper headings.
+A line that reads as a version heading (`### 1.2.0 ...`, even inside a code fence) would
+split the section for both readers, and `#`/`##` would outrank the release's own heading:
+both are refused. Remember the two surfaces render differently: GitHub autolinks `@user`
+(and notifies them) and `#123`, Obsidian renders `[[links]]`. The release uses it as the
+section's body under the generated version header, then deletes it in the release commit.
+Without it, the generated list is used. `release.sh` validates the file and says which
+source the release will use before dispatching. Never hand-edit a GitHub release body
+afterwards: that is how the two surfaces came to disagree.
+
 Before releasing: push, then wait for CI to go **green**. The release workflow builds from
 what is on `main`, so dispatching while CI is still running means finding out whether the
 code was releasable only after the tag exists — and a tag is the one part of this that is
@@ -710,6 +726,7 @@ The community-plugin reviewer runs a fixed set of lint rules against every submi
 ### Build-time inlining
 
 - **CHANGELOG.md reaches the "What's new" view through a bundler `define`, not an import.** `import changelog from '../../CHANGELOG.md' with { type: 'text' }` is not resolvable on every Bun version, and the community catalog reviewer builds with one where it is not: the build fails there while succeeding locally. `scripts/build.ts` reads the file and substitutes `__PLUGIN_CHANGELOG__`; `src/app/whats-new.ts` declares the binding inline (not in a `.d.ts`, so `no-undef` sees it) and `typeof`-guards it for the test and dev runtimes, where nothing substitutes.
+- The curated notes (`NEXT_RELEASE.md`) reach the tab through the same path: `scripts/generate-changelog.ts` writes them into the new CHANGELOG.md section (`applyCuratedNotes`), and the release body is cut from CHANGELOG.md by the tab's own parser (`--release-body`, written to a file for `body_path`, never through a heredoc step output), so the tab and the GitHub release body always carry the same text.
 - Keep CHANGELOG.md out of `.gitattributes` `export-ignore` regardless — the archive build still needs it to produce non-empty release notes.
 
 ### Release workflow
