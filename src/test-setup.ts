@@ -109,3 +109,9 @@ void mock.module('obsidian', () => ({
     setIcon: () => {},
     setTooltip: () => {}
 }))
+
+// Obsidian's popout-aware document global. Focused by default; a spec
+// toggles it with spyOn(activeDocument, 'hasFocus').mockReturnValue(false).
+// `self`, not `globalThis` (obsidianmd/no-global-this): Bun defines it as
+// the global object.
+Object.assign(self, { activeDocument: { hasFocus: (): boolean => true } })
