@@ -1,5 +1,14 @@
 # Release Notes
 
+## 1.4.1 (2026-09-28)
+
+### Bug Fixes
+
+- **build:** harden the release path from the template
+- **build:** rebuild versions.json from the published releases
+- **plugin:** keep the support block from stacking on every settings refresh
+- **plugin:** popout-aware focus check, main-window hidden hosts, destructive Forget
+
 ## 1.4.0 (2026-09-23)
 
 ### Features

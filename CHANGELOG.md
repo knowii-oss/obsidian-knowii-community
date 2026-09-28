@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.1](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.4.0...1.4.1) (2026-09-28)
+
+### Bug Fixes
+
+* **build:** harden the release path from the template ([65cad5c](https://github.com/knowii-oss/obsidian-knowii-community/commit/65cad5c573ba567d9ec1c6ec12d510230d2d00c7))
+* **build:** rebuild versions.json from the published releases ([377e61c](https://github.com/knowii-oss/obsidian-knowii-community/commit/377e61c77bc2be1283e05156c2b028c2995aeacc))
+* **plugin:** keep the support block from stacking on every settings refresh ([1c9ef06](https://github.com/knowii-oss/obsidian-knowii-community/commit/1c9ef0697331f0db8269e9b605c7ce79bff0fd76))
+* **plugin:** popout-aware focus check, main-window hidden hosts, destructive Forget ([0a3cf0b](https://github.com/knowii-oss/obsidian-knowii-community/commit/0a3cf0bc8be061da3c60dc6e275b6773f9a043e4))
+
 ## [1.4.0](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.3.0...1.4.0) (2026-09-23)
 
 ### Features
@@ -42,6 +51,7 @@ All notable changes to this project will be documented in this file.
 
 * open the Knowii community in a pane inside Obsidian ([6378940](https://github.com/knowii-oss/obsidian-knowii-community/commit/63789405b26aa8423414b6714950546ada6d6db6))
 * use the Knowii logo as the plugin icon ([1b6cf87](https://github.com/knowii-oss/obsidian-knowii-community/commit/1b6cf877e687ad4853f899a8213bc124bc1077f5))
+
 
 
 
