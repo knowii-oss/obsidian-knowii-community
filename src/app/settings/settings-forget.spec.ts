@@ -10,11 +10,13 @@ import { createDefaultSettings } from '../types/plugin-settings.intf'
 class FakeEl {
     readonly children: FakeEl[] = []
     readonly clicks: (() => void)[] = []
+    classes: string[] = []
     text = ''
 
-    createEl(_tag: string, options: { text?: string } = {}): FakeEl {
+    createEl(_tag: string, options: { text?: string; cls?: string | string[] } = {}): FakeEl {
         const child = new FakeEl()
         child.text = options.text ?? ''
+        child.classes = options.cls === undefined ? [] : [options.cls].flat()
         this.children.push(child)
         return child
     }
@@ -156,8 +158,9 @@ describe('Forget stored session', () => {
         expect(forgetStoredSession).not.toHaveBeenCalled()
     })
 
-    test('confirming forgets it', async () => {
+    test('confirming forgets it, from a destructive confirm button', async () => {
         const { dialog, forgetStoredSession, done } = clickForget()
+        expect(dialog.button('Forget').classes).toEqual(['mod-cta', 'mod-destructive'])
         dialog.button('Forget').click()
         await done
         expect(forgetStoredSession).toHaveBeenCalledTimes(1)
