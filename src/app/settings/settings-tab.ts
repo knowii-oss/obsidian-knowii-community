@@ -3,6 +3,7 @@ import type { App, SettingDefinitionItem, SettingGroupItem } from 'obsidian'
 import type KnowiiCommunityPlugin from '../../main'
 import { BUY_ME_A_COFFEE_BADGE_DATA_URL } from '../assets/buy-me-a-coffee'
 import { BUY_ME_A_COFFEE_URL, renderSupportSection } from '../ui/support-links'
+import { confirmAction } from '../ui/confirm-modal'
 import { normalizeCommunityUrl } from '../domain/community-links'
 import {
     CHECK_INTERVALS_SECONDS,
@@ -292,6 +293,17 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                                         .setButtonText('Forget')
                                         .setDestructive()
                                         .onClick(async () => {
+                                            // Forgetting stops notifications on
+                                            // every device that relies on it.
+                                            const confirmed = await confirmAction(this.app, {
+                                                title: 'Forget the stored session?',
+                                                text: 'Devices that get notifications through this vault, such as your phone, stop getting them. Any desktop signed in to the Knowii pane, this one included, stores the session again at its next check: to remove it for good, sign out in the pane.',
+                                                confirm: 'Forget',
+                                                destructive: true
+                                            })
+                                            if (!confirmed) {
+                                                return
+                                            }
                                             await this.plugin.forgetStoredSession()
                                             this.update()
                                         })

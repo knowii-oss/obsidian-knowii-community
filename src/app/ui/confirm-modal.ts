@@ -8,7 +8,13 @@ import type { App } from 'obsidian'
  */
 export function confirmAction(
     app: App,
-    options: { title: string; text: string; confirm: string }
+    options: {
+        title: string
+        text: string
+        confirm: string
+        /** Draws the confirm button filled red (Obsidian's destructive CTA). */
+        destructive?: boolean
+    }
 ): Promise<boolean> {
     return new Promise((resolve) => {
         let answered = false
@@ -17,7 +23,11 @@ export function confirmAction(
         modal.titleEl.setText(options.title)
         modal.contentEl.createEl('p', { text: options.text })
         const buttons = modal.contentEl.createDiv({ cls: 'modal-button-container' })
-        const confirm = buttons.createEl('button', { cls: 'mod-cta', text: options.confirm })
+        const confirm = buttons.createEl('button', {
+            // mod-destructive is what ButtonComponent.setDestructive() adds.
+            cls: options.destructive ? ['mod-cta', 'mod-destructive'] : 'mod-cta',
+            text: options.confirm
+        })
         confirm.addEventListener('click', () => {
             answered = true
             modal.close()
