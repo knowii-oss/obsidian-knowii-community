@@ -2,6 +2,24 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.4.1...1.5.0) (2026-09-28)
+
+### Forgetting the stored session now asks first
+
+**Settings → Advanced → Stored session → Forget** now asks for confirmation before removing
+your Knowii sign-in from this vault. Forgetting it stops notifications on every device that
+relies on it, such as your phone, so a stray click no longer does that.
+
+The dialog also says what Forget cannot do: any desktop signed in to the Knowii pane,
+including the one you click Forget on, stores the session again at its next check. To remove it
+for good, sign out in the pane.
+
+### Under the hood
+
+More tests around system notifications and the settings screen, and a fix that keeps the
+plugin's default settings from being locked in memory. Nothing changes in how the plugin
+behaves.
+
 ## [1.4.1](https://github.com/knowii-oss/obsidian-knowii-community/compare/1.4.0...1.4.1) (2026-09-28)
 
 ### Bug Fixes
@@ -51,6 +69,7 @@ All notable changes to this project will be documented in this file.
 
 * open the Knowii community in a pane inside Obsidian ([6378940](https://github.com/knowii-oss/obsidian-knowii-community/commit/63789405b26aa8423414b6714950546ada6d6db6))
 * use the Knowii logo as the plugin icon ([1b6cf87](https://github.com/knowii-oss/obsidian-knowii-community/commit/1b6cf877e687ad4853f899a8213bc124bc1077f5))
+
 
 
 
