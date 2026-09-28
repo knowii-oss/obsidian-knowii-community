@@ -68,10 +68,31 @@ function isToggleKey(key: string): key is ToggleKey {
 /**
  * Settings tab, declared rather than rendered (Obsidian 1.13+).
  *
- * `getSettingDefinitions()` REPLACES `display()`: the whole settings UI is
- * declarative. A `render:` hook writes into its own row only; `defaultValue`
- * is never declared on numeric controls; `setControlValue` rejects on failure
- * so the framework rolls the control back to the stored truth.
+ * `getSettingDefinitions()` REPLACES `display()`: when it returns a non-empty
+ * array, `display()` is never called. There is no partial adoption — the whole
+ * settings UI is declarative, or none of it. In exchange, Obsidian owns
+ * navigation, focus and ARIA, and every declared `name`/`desc` is indexed by
+ * the settings search.
+ *
+ * Rules that each cost a shipped bug the first time they were broken
+ * (see AGENTS.md "Declarative settings" for the full list):
+ *
+ * - A `render:` hook renders the ROW. Write into `setting.settingEl` only;
+ *   anything written outside it (e.g. `group.listEl`) is the framework's to
+ *   discard, and the control simply does not appear.
+ * - `update()` re-runs a render hook on the SAME row and resets only its
+ *   control area. A hook that appends anywhere else in the row must return a
+ *   cleanup that removes what it added, or every refresh stacks a copy.
+ * - Obsidian builds the definitions only in `update()` and reuses them on
+ *   every opening. Anything read from outside the settings (another plugin's
+ *   state) belongs in a render hook, which each opening re-runs.
+ * - `defaultValue` is the fallback for a RESOLVER returning undefined/null,
+ *   NOT for a cleared input. Do not declare it on numeric controls; let a
+ *   `validate` bounds-check refuse the cleared value inline.
+ * - A row `action:` fires on the whole row, not on a button. Destructive
+ *   actions need their own confirmation modal.
+ * - `setControlValue` MUST reject on failure. Resolving tells the framework
+ *   the write landed, so the pane keeps showing a value that was never stored.
  */
 export class KnowiiCommunitySettingTab extends PluginSettingTab {
     plugin: KnowiiCommunityPlugin
@@ -287,15 +308,22 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                         name: 'Support',
                         // Not a setting — keep it out of the settings search.
                         searchable: false,
-                        render: (setting): void => {
-                            // Render INSIDE the row (settingEl), never outside it.
+                        render: (setting): (() => void) => {
+                            // Render INSIDE the row (settingEl), never into
+                            // group.listEl — see the class docs above.
                             setting.infoEl.remove() // the section draws its own headings
                             // `.setting-item` is a flex ROW; the support block
                             // is a stack of full-width rows.
                             setting.settingEl.addClass('settings-stack')
-                            renderSupportSection(setting.settingEl, (el) => {
+                            // In a wrapper removed by the returned cleanup:
+                            // update() re-runs this hook on the SAME row and
+                            // only resets the control area, so content appended
+                            // straight to settingEl would pile up.
+                            const blockEl = setting.settingEl.createDiv()
+                            renderSupportSection(blockEl, (el) => {
                                 this.renderBuyMeACoffeeBadge(el)
                             })
+                            return () => blockEl.remove()
                         }
                     }
                 ]
