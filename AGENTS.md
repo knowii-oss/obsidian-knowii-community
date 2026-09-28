@@ -170,7 +170,10 @@ Both commands are **MANDATORY** after code changes. Fix any lint errors before p
 
 ## Bun Runtime
 
-Default to using Bun instead of Node.js.
+Default to using Bun instead of Node.js, with one exception: ESLint runs under Node.
+
+- `bunfig.toml` sets `[run] bun = false`, so scripts with a `node` shebang (eslint, tsc, prettier, commitlint) run under Node, as the community catalog reviewer's lint does. Under Bun, `node:module` `isBuiltin('bun:test')` is true and `obsidianmd/no-nodejs-modules` misreads every spec's `bun:test` import.
+- Node must be on PATH (version in `.nvmrc`). Without it, `bun run lint` stops with a message instead of reporting findings the reviewer never raises. CI sets Node up from `.nvmrc`. A desktop-only plugin (`isDesktopOnly: true`) is exempt from the check: the preset turns the Node-module rules off for it, so Bun lints it the same way.
 
 - Use `bun <file>` instead of `node <file>` or `ts-node <file>`
 - Use `bun run test` instead of `jest` or `vitest` (the script adds `--isolate`; see Testing)
@@ -311,7 +314,7 @@ These rules apply to **`id`**, **`name`**, and **`description`** in `manifest.js
 This template declares its settings via `getSettingDefinitions()` (see
 `src/app/settings/settings-tab.ts`). Keep that approach. Every rule below cost
 a shipped bug the first time it was broken; `settings-guard.spec.ts` enforces
-the two statically-catchable ones.
+the three statically-catchable ones.
 
 - **`getSettingDefinitions()` REPLACES `display()`.** Non-empty array means
   `display()` is never called. No partial adoption: the whole settings UI is
@@ -320,8 +323,24 @@ the two statically-catchable ones.
   (drop `setting.infoEl` when the helper draws its own name/desc). Anything
   written outside the row — `group.listEl`, siblings — is the framework's to
   discard: the control is silently absent at runtime. Never call
-  `settingEl.remove()`. Staying inside the row also means the framework tears
-  the widget down on re-render, so re-renders cannot stack duplicates.
+  `settingEl.remove()`.
+- **`update()` re-runs a `render:` hook on the SAME row and resets only its
+  control area (`controlEl`).** Controls added with `addButton`/`addText` are
+  cleared, but anything the hook appends elsewhere in the row (a support
+  block, help text, a status line) stays and is appended again: every refresh
+  stacks another copy. Render such content into a wrapper and return a
+  cleanup that removes it: create `el` with `setting.settingEl.createDiv()`,
+  draw into it, and `return () => el.remove()`. Obsidian calls the cleanup
+  before re-running the hook. Verified in Obsidian 1.13.7, where fleet
+  plugins using this template's Support row went from 1 to 3 copies after
+  two `update()` calls; a stacked editor also kept its stale copy on top,
+  whose Save wrote an outdated list.
+- **The definitions are built only in `update()` and reused on every
+  opening.** Anything a definition captures from outside the settings (another
+  plugin's state, e.g. which Starter Kit note types exist) is frozen at the
+  last `update()`, and plugin `onload` is early: other plugins may not be
+  loaded yet. Read such state in a `render:` hook or a `visible:` predicate,
+  which run on every render.
 - **`defaultValue` is the fallback for a RESOLVER returning undefined/null —
   not for a cleared input.** On numeric controls it turns a cleared field into
   a silent reset to the schema default. Declare none; let a bounds `validate`
@@ -365,7 +384,7 @@ the two statically-catchable ones.
 
 ## Versioning & releases
 
-- Bump `version` in `manifest.json` (SemVer) and update `versions.json` to map plugin version → minimum app version.
+- Do not bump `version` in `manifest.json` or edit `versions.json` by hand: `bun run release` does both. `versions.json` gets a new line ONLY when a release raises `minAppVersion`, and that line names the LAST release on the old floor (`"<last release>": "<its minAppVersion>"`), so users left behind by the raise get the newest release that still runs for them. Obsidian reads the file only when the latest manifest's floor is above the user's app, and installs the highest listed release whose floor the app meets. `scripts/version-bump.ts` finds that release as the highest `x.y.z` tag below the new version and fails the release rather than skip the line if it cannot. Every key must be a real published release in `x.y.z` form.
 - Create a GitHub release whose tag exactly matches `manifest.json`'s `version`. Do not use a leading `v`.
 - Attach `manifest.json`, `main.js`, and `styles.css` (if present) to the release as individual assets.
 - After the initial release, follow the process to add/update your plugin in the community catalog as required.
