@@ -101,25 +101,40 @@ export const DEFAULT_NOTIFY_CATEGORIES: Record<ActivityCategory, boolean> = Obje
     ACTIVITY_CATEGORIES.map((info) => [info.id, true])
 ) as Record<ActivityCategory, boolean>
 
-export const DEFAULT_SETTINGS: PluginSettings = {
-    communityUrl: 'https://www.knowii.net',
-    paneLocation: 'tab',
-    showRibbonIcon: true,
-    showToolbar: true,
-    rememberLastPage: true,
-    zoomPercent: 100,
-    notificationsEnabled: true,
-    checkIntervalSeconds: DEFAULT_CHECK_INTERVAL_SECONDS,
-    showNotices: true,
-    desktopNotifications: 'always',
-    showStatusBarBadge: true,
-    showRibbonBadge: true,
-    notifyCategories: DEFAULT_NOTIFY_CATEGORIES,
-    watchWholeCommunity: true,
-    mutedSpaceIds: [],
-    notesFolder: 'Knowii',
-    session: null
+/**
+ * A fresh default settings object, safe to hand to Immer.
+ *
+ * `produce` deep-freezes what it returns, including any subtree it shares
+ * with its base. Producing from the shared DEFAULT_SETTINGS froze that
+ * constant (and its arrays) for the rest of the process, so any later code
+ * or test touching it failed with "Attempted to assign to readonly
+ * property". Produce from this instead, and keep it deep-fresh: build
+ * nested arrays and objects as new values, never by spreading DEFAULT_SETTINGS.
+ */
+export function createDefaultSettings(): PluginSettings {
+    return {
+        communityUrl: 'https://www.knowii.net',
+        paneLocation: 'tab',
+        showRibbonIcon: true,
+        showToolbar: true,
+        rememberLastPage: true,
+        zoomPercent: 100,
+        notificationsEnabled: true,
+        checkIntervalSeconds: DEFAULT_CHECK_INTERVAL_SECONDS,
+        showNotices: true,
+        desktopNotifications: 'always',
+        showStatusBarBadge: true,
+        showRibbonBadge: true,
+        notifyCategories: { ...DEFAULT_NOTIFY_CATEGORIES },
+        watchWholeCommunity: true,
+        mutedSpaceIds: [],
+        notesFolder: 'Knowii',
+        session: null
+    }
 }
+
+/** The defaults, for reading and comparing. Never produce from it. */
+export const DEFAULT_SETTINGS: PluginSettings = createDefaultSettings()
 
 export function isPaneLocation(value: unknown): value is PaneLocation {
     return 'string' === typeof value && (PANE_LOCATIONS as readonly string[]).includes(value)

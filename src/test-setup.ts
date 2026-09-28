@@ -17,6 +17,10 @@ void mock.module('obsidian', () => ({
     App: class App {},
     TFile: class TFile {},
     Plugin: class Plugin {},
+    // The What's new and community views (reached from plugin.ts) extend
+    // ItemView and render with MarkdownRenderer.
+    ItemView: class ItemView {},
+    MarkdownRenderer: { render: async () => {} },
     PluginSettingTab: class PluginSettingTab {},
     Setting: class Setting {},
     MarkdownView: class MarkdownView {},
@@ -98,6 +102,9 @@ void mock.module('obsidian', () => ({
             json: {},
             arrayBuffer: new ArrayBuffer(0)
         }),
+    // plugin.ts and the note saver import these at module load.
+    addIcon: () => {},
+    normalizePath: (path: string) => path,
     debounce: (fn: (...args: unknown[]) => unknown) => fn,
     setIcon: () => {},
     setTooltip: () => {}

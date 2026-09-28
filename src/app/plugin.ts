@@ -1,7 +1,7 @@
 import { MarkdownView, Menu, Notice, Platform, Plugin, TFile, addIcon } from 'obsidian'
 import type { WorkspaceLeaf } from 'obsidian'
 import {
-    DEFAULT_SETTINGS,
+    createDefaultSettings,
     isCheckInterval,
     isPaneLocation,
     isValidZoomPercent,
@@ -91,7 +91,7 @@ export class KnowiiCommunityPlugin extends Plugin {
     /**
      * The plugin settings are immutable
      */
-    override settings: PluginSettings = produce(DEFAULT_SETTINGS, () => DEFAULT_SETTINGS)
+    override settings: PluginSettings = produce(createDefaultSettings(), () => {})
 
     private ribbonIconEl: HTMLElement | null = null
 
@@ -1251,14 +1251,14 @@ export class KnowiiCommunityPlugin extends Plugin {
 
         if (!loaded || 'object' !== typeof loaded) {
             log('Using default settings', 'debug')
-            this.settings = produce(DEFAULT_SETTINGS, () => DEFAULT_SETTINGS)
+            this.settings = produce(createDefaultSettings(), () => {})
             return
         }
         const data = loaded as Partial<Record<keyof PluginSettings, unknown>>
 
         let needToSaveSettings = false
 
-        this.settings = produce(DEFAULT_SETTINGS, (draft: Draft<PluginSettings>) => {
+        this.settings = produce(createDefaultSettings(), (draft: Draft<PluginSettings>) => {
             // Strict checks: loadData can return anything (older versions,
             // hand-edited data.json). Anything off-type falls back to the
             // default and is written back.
