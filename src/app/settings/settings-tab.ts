@@ -268,7 +268,7 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                                 setting.addButton((button) =>
                                     button
                                         .setButtonText('Forget')
-                                        .setWarning()
+                                        .setDestructive()
                                         .onClick(async () => {
                                             await this.plugin.forgetStoredSession()
                                             this.update()

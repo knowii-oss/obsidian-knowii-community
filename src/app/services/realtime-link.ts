@@ -84,7 +84,10 @@ export class RealtimeLink {
         this.key = key
         this.setStatus('connecting')
 
-        const container = document.body.createDiv({ cls: 'knowii-community-hidden-host' })
+        // The hidden host lives in the main window on purpose: it outlives any
+        // popout, and closing the popout the user happened to focus must not
+        // tear down the live link.
+        const container = window.document.body.createDiv({ cls: 'knowii-community-hidden-host' })
         container.setAttribute('aria-hidden', 'true')
         const element = container.createEl('webview' as keyof HTMLElementTagNameMap)
         element.setAttribute('partition', this.host.partition)

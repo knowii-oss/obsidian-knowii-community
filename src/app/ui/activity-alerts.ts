@@ -49,7 +49,7 @@ export function announceItems(items: readonly ActivityItem[], options: AlertOpti
             )
         }
     }
-    if (wantsDesktopNotification(options.desktop, document.hasFocus())) {
+    if (wantsDesktopNotification(options.desktop, activeDocument.hasFocus())) {
         for (const item of individual) {
             showDesktopNotification(item.title, describe(item), () => options.open(item))
         }
@@ -72,7 +72,7 @@ export function announceBacklog(count: number, options: AlertOptions): void {
     if (options.notices) {
         showSummaryNotice(text, options.openList)
     }
-    if (wantsDesktopNotification(options.desktop, document.hasFocus())) {
+    if (wantsDesktopNotification(options.desktop, activeDocument.hasFocus())) {
         showDesktopNotification('Knowii', text, options.openList)
     }
 }

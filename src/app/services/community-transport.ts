@@ -303,7 +303,12 @@ export class HiddenWebviewTransport implements CommunityTransport {
         this.dispose()
         this.loadedBase = baseUrl
         const ready = new Promise<HiddenWebview>((resolve, reject) => {
-            const container = document.body.createDiv({ cls: 'knowii-community-hidden-host' })
+            // The hidden host lives in the main window on purpose: it outlives
+            // any popout, so closing the window the user focused last cannot
+            // tear down the session.
+            const container = window.document.body.createDiv({
+                cls: 'knowii-community-hidden-host'
+            })
             container.setAttribute('aria-hidden', 'true')
             const element = container.createEl('webview' as keyof HTMLElementTagNameMap)
             element.setAttribute('partition', this.partition)

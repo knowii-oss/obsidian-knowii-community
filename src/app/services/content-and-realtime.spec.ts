@@ -212,7 +212,7 @@ describe('EventReminders', () => {
         const store = new Map<string, unknown>()
         const reminded: string[] = []
         const timers: { fn: () => void; ms: number }[] = []
-        const g = globalThis as unknown as { window?: unknown }
+        const g = self as unknown as { window?: unknown }
         const previous = g.window
         g.window = {
             setTimeout: (fn: () => void, ms: number) => timers.push({ fn, ms }),
