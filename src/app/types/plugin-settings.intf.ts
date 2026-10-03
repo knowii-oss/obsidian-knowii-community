@@ -1,6 +1,7 @@
 import type { ActivityCategory } from '../domain/community-activity'
 import { ACTIVITY_CATEGORIES } from '../domain/community-activity'
 import type { StoredSession } from '../domain/session-cookies'
+import { DEFAULT_SESSION_SECRET_NAME } from '../domain/session-secret'
 
 /** When system notifications are shown: always, only while Obsidian is in the background, or never. */
 export type DesktopNotificationMode = 'always' | 'background' | 'off'
@@ -80,11 +81,20 @@ export interface PluginSettings {
     notesFolder: string
 
     /**
-     * The member's community session (cookies), copied from the desktop
-     * pane. Lets every device where the vault syncs check for activity, and
-     * restores the pane's sign-in. Null when signed out.
+     * Name of the secret (Obsidian's secret storage, per vault and per
+     * device) holding the member's community session. Only the name is in
+     * `data.json`, never the session.
      */
-    session: StoredSession | null
+    sessionSecretName: string
+    /**
+     * Legacy: the session as stored in `data.json` (field `session`) before
+     * it moved to the secret storage. Read-only bootstrap for devices that
+     * have not migrated yet; never written with a new value, removed after
+     * the grace period, on sign-in, sign-out or from the settings.
+     */
+    legacySession: StoredSession | null
+    /** When a device first moved the legacy session to its secret storage (ISO). */
+    legacySecretMigratedAt: string | null
 }
 
 export const MIN_ZOOM_PERCENT = 50
@@ -129,7 +139,9 @@ export function createDefaultSettings(): PluginSettings {
         watchWholeCommunity: true,
         mutedSpaceIds: [],
         notesFolder: 'Knowii',
-        session: null
+        sessionSecretName: DEFAULT_SESSION_SECRET_NAME,
+        legacySession: null,
+        legacySecretMigratedAt: null
     }
 }
 
@@ -186,4 +198,14 @@ export function parseSpaceIds(value: unknown): number[] | null {
     }
     const ids = value.filter((id): id is number => 'number' === typeof id && Number.isInteger(id))
     return [...new Set(ids)]
+}
+
+/**
+ * The settings as written to `data.json`. The legacy session keeps its
+ * historical key (`session`) so devices that have not migrated still find it,
+ * and is left out entirely once dropped.
+ */
+export function settingsToDisk(settings: PluginSettings): Record<string, unknown> {
+    const { legacySession, ...rest } = settings
+    return legacySession ? { ...rest, session: legacySession } : { ...rest }
 }

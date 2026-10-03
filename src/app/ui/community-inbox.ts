@@ -231,8 +231,8 @@ export class CommunityInbox {
         const card = this.renderMessage(
             list,
             KNOWII_ICON_ID,
-            'Sign in once on desktop',
-            'Open Knowii in the Obsidian desktop app and sign in. Your session then reaches this device with your vault, and what is new shows up here.'
+            'Not signed in on this device',
+            "This device has no Knowii session for this vault. Sessions are kept in Obsidian's secret storage on each device and no longer travel with the vault. You can still open Knowii in the browser."
         )
         const buttons = card.createDiv({ cls: `${CLS}-card-buttons` })
         this.cardButton(buttons, 'Open Knowii in the browser', true, () => {

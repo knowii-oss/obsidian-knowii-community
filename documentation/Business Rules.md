@@ -4,9 +4,13 @@ This document defines the core business rules. These rules MUST be respected in 
 
 ---
 
-## One session per vault, stored in the plugin settings
+## One session per vault, stored in the secret storage
 
-The pane uses a persistent partition dedicated to the plugin and to the vault (`persist:knowii-community-<vault id>`, `communityPartition`) so the member signs in once. Electron partitions are shared by every vault the app opens: a partition without the vault id copied the main vault's session into the next vault opened (the OSK kit, 2026-09-23). A vault never gets a session from another vault; a new vault starts signed out. The session cookies of that partition are also persisted in the plugin settings (`data.json`, field `session`): other devices where the vault syncs use them to check for activity, and a desktop without a session gets it restored into the partition. The user documentation says so plainly.
+The pane uses a persistent partition dedicated to the plugin and to the vault (`persist:knowii-community-<vault id>`, `communityPartition`) so the member signs in once. Electron partitions are shared by every vault the app opens: a partition without the vault id copied the main vault's session into the next vault opened (the OSK kit, 2026-09-23). A vault never gets a session from another vault; a new vault starts signed out. The session cookies of that partition are also persisted in Obsidian's secret storage (per vault, per device; secret named by `sessionSecretName`, default `knowii-community-session`), never in `data.json` (Sébastien, 2026-10-03): checks without the pane (mobile) use it, and a desktop without a session gets it restored into the partition. The user documentation says so plainly.
+
+## Moving the session out of data.json never signs anyone out
+
+Until 1.5 the session was in `data.json` (`session`). It stays there read-only as a bootstrap: on every load, every device copies it into its own secret storage when it has none; reads prefer the secret storage and fall back to it. New values never go to `data.json`. A refresh (same sign-in, new cookies) writes this device's secret only and keeps the legacy copy; a new sign-in writes the secret and deletes the legacy copy; sign-out or Forget clears this device's secret (`''`, no delete API) and deletes the legacy copy. `legacySecretMigratedAt` records the first migration; the legacy copy is deleted 60 days later, or with the "Remove plain-text copy now" button.
 
 ## Never sign the member back in behind their back
 

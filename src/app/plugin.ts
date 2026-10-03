@@ -7,7 +7,8 @@ import {
     isValidZoomPercent,
     parseNotifyCategories,
     parseSpaceIds,
-    readDesktopNotificationMode
+    readDesktopNotificationMode,
+    settingsToDisk
 } from './types/plugin-settings.intf'
 import type { PluginSettings } from './types/plugin-settings.intf'
 import { KnowiiCommunitySettingTab } from './settings/settings-tab'
@@ -33,6 +34,14 @@ import {
     hasAuthCookie,
     parseStoredSession
 } from './domain/session-cookies'
+import type { LegacyMigration } from './domain/session-secret'
+import {
+    isValidSecretName,
+    migrateLegacySession,
+    parseIsoDate,
+    resolveSession,
+    writeSessionSecret
+} from './domain/session-secret'
 import {
     ElectronSessionTransport,
     HiddenWebviewTransport,
@@ -142,7 +151,10 @@ export class KnowiiCommunityPlugin extends Plugin {
 
     override onunload() {}
 
-    /** `data.json` changed on disk (vault sync): pick up a session from another device. */
+    /**
+     * `data.json` changed on disk (vault sync): pick up the settings, and a
+     * legacy session from a device that has not migrated yet.
+     */
     override async onExternalSettingsChange(): Promise<void> {
         const previous = this.settings
         await this.loadSettings()
@@ -159,7 +171,7 @@ export class KnowiiCommunityPlugin extends Plugin {
             ? new ElectronSessionTransport(electronSession)
             : null
         this.storedTransport = new StoredCookiesTransport(
-            () => this.settings.session?.cookies ?? null
+            () => this.storedSession()?.cookies ?? null
         )
 
         const inbox = new ActivityInbox({
@@ -300,7 +312,7 @@ export class KnowiiCommunityPlugin extends Plugin {
      */
     private async restoreSessionAtStartup(): Promise<void> {
         const electron = this.electronTransport
-        const stored = this.settings.session
+        const stored = electron ? this.storedSession() : null
         if (!electron || !stored) {
             return
         }
@@ -682,7 +694,7 @@ export class KnowiiCommunityPlugin extends Plugin {
                     void this.activateView()
                 } else {
                     new Notice(
-                        'Sign in to Knowii in the Obsidian desktop app once: the session then reaches this device with your vault.'
+                        'This device has no Knowii session for this vault. You can open Knowii in your browser.'
                     )
                 }
                 return
@@ -712,14 +724,17 @@ export class KnowiiCommunityPlugin extends Plugin {
             if (!hasAuthCookie(cookies)) {
                 return
             }
-            const stored = this.settings.session
-            if (!stored || authFingerprint(stored.cookies) !== authFingerprint(cookies)) {
-                await this.saveSession({ cookies, savedAt: new Date().toISOString() })
+            const stored = this.storedSession()
+            const session = { cookies, savedAt: new Date().toISOString() }
+            if (!stored) {
+                await this.replaceSession(session)
+            } else if (authFingerprint(stored.cookies) !== authFingerprint(cookies)) {
+                this.refreshSession(session)
             }
             return
         }
         // Signed out in the pane.
-        const stored = this.settings.session
+        const stored = this.storedSession()
         if (!stored) {
             return
         }
@@ -727,7 +742,7 @@ export class KnowiiCommunityPlugin extends Plugin {
         // out (or the session ended). Never sign them back in behind their back.
         if ('signed-in' === this.watcher?.current.status) {
             this.sessionRestoreAttempted = true
-            await this.saveSession(null)
+            await this.clearSession()
             return
         }
         if (!this.sessionRestoreAttempted) {
@@ -737,12 +752,12 @@ export class KnowiiCommunityPlugin extends Plugin {
             return
         }
         // The stored session did not work either: it is dead, forget it.
-        await this.saveSession(null)
+        await this.clearSession()
     }
 
     /** Cookie updates from the community on the stored-session transport. */
     private onSetCookies(headers: readonly string[]): void {
-        const stored = this.settings.session
+        const stored = this.storedSession()
         if (!stored) {
             return
         }
@@ -751,16 +766,72 @@ export class KnowiiCommunityPlugin extends Plugin {
         if (authFingerprint(cookies) === authFingerprint(stored.cookies)) {
             return
         }
-        void this.saveSession(
-            hasAuthCookie(cookies) ? { cookies, savedAt: new Date().toISOString() } : null
-        )
+        if (hasAuthCookie(cookies)) {
+            this.refreshSession({ cookies, savedAt: new Date().toISOString() })
+        } else {
+            void this.clearSession()
+        }
     }
 
-    /** Stores (or forgets) the session without touching anything on screen. */
-    saveSession(session: StoredSession | null): Promise<void> {
-        return this.updateSettings(
+    /**
+     * The session this device uses: its secret storage first, the legacy
+     * copy from `data.json` otherwise (moved into the secret storage on the
+     * way). Read on every use, never kept in the settings.
+     */
+    storedSession(): StoredSession | null {
+        try {
+            return resolveSession(
+                this.app.secretStorage,
+                this.settings.sessionSecretName,
+                this.settings.legacySession
+            )
+        } catch (error: unknown) {
+            log('Could not read the stored session', 'warn', error)
+            return null
+        }
+    }
+
+    /** Whether `data.json` still holds the legacy plain-text session. */
+    get hasLegacySession(): boolean {
+        return null !== this.settings.legacySession
+    }
+
+    /**
+     * Same sign-in, new cookies: written to this device's secret storage
+     * only. Other devices keep using their own copy.
+     */
+    refreshSession(session: StoredSession): void {
+        this.writeSessionSecret(session)
+    }
+
+    /** A new sign-in: this device's secret storage; the legacy copy is stale now. */
+    async replaceSession(session: StoredSession): Promise<void> {
+        this.writeSessionSecret(session)
+        await this.dropLegacySession()
+    }
+
+    /** Signed out or forgotten: clears this device's secret and the legacy copy. */
+    async clearSession(): Promise<void> {
+        this.writeSessionSecret(null)
+        await this.dropLegacySession()
+    }
+
+    private writeSessionSecret(session: StoredSession | null): void {
+        try {
+            writeSessionSecret(this.app.secretStorage, this.settings.sessionSecretName, session)
+        } catch (error: unknown) {
+            log('Could not write the stored session', 'warn', error)
+        }
+    }
+
+    /** Removes the legacy plain-text session from `data.json` (nothing on screen changes). */
+    private async dropLegacySession(): Promise<void> {
+        if (null === this.settings.legacySession) {
+            return
+        }
+        await this.updateSettings(
             (draft) => {
-                draft.session = castDraft(session)
+                draft.legacySession = null
             },
             { apply: false }
         )
@@ -768,8 +839,19 @@ export class KnowiiCommunityPlugin extends Plugin {
 
     /** Forget the stored session (settings button). The pane's own sign-in is untouched. */
     async forgetStoredSession(): Promise<void> {
-        await this.saveSession(null)
-        new Notice('The stored Knowii session was removed from the plugin settings.')
+        await this.clearSession()
+        new Notice('The stored Knowii session was removed from this device.')
+    }
+
+    /**
+     * Removes the plain-text copy of the session from `data.json` now
+     * (settings button), after making sure this device has it in its
+     * secret storage.
+     */
+    async removeLegacySessionCopy(): Promise<void> {
+        this.storedSession()
+        await this.dropLegacySession()
+        new Notice('The plain-text copy of your Knowii session was removed from data.json.')
     }
 
     // -----------------------------------------------------------------------
@@ -1342,13 +1424,25 @@ export class KnowiiCommunityPlugin extends Plugin {
             } else {
                 needToSaveSettings = true
             }
-            // No session on disk is normal (signed out); only a broken one is rewritten.
-            const session = parseStoredSession(data.session)
-            draft.session = castDraft(session)
-            if (null === session && null !== data.session && undefined !== data.session) {
+            if (isValidSecretName(data.sessionSecretName)) {
+                draft.sessionSecretName = data.sessionSecretName
+            } else {
                 needToSaveSettings = true
             }
+            // Legacy plain-text session (`session`): absent is normal, only a
+            // broken one is rewritten (dropped).
+            const legacy = data as { session?: unknown }
+            const session = parseStoredSession(legacy.session)
+            draft.legacySession = castDraft(session)
+            if (null === session && null !== legacy.session && undefined !== legacy.session) {
+                needToSaveSettings = true
+            }
+            draft.legacySecretMigratedAt = parseIsoDate(data.legacySecretMigratedAt)
         })
+
+        if (this.migrateLegacySession()) {
+            needToSaveSettings = true
+        }
 
         log(`Settings loaded`, 'debug', this.settings)
 
@@ -1375,7 +1469,7 @@ export class KnowiiCommunityPlugin extends Plugin {
         const write = this.settingsWriteChain.then(async () => {
             const previous = this.settings
             const next = produce(this.settings, mutator)
-            await this.saveData(next)
+            await this.saveData(settingsToDisk(next))
             this.settings = next
             if (false !== options.apply) {
                 this.applySettings(previous)
@@ -1386,11 +1480,47 @@ export class KnowiiCommunityPlugin extends Plugin {
     }
 
     /**
+     * Moves the legacy plain-text session into this device's secret storage
+     * (every device, every load, idempotent), records when that first
+     * happened, and drops the legacy copy once the grace period is over.
+     * Returns whether the settings changed.
+     */
+    private migrateLegacySession(): boolean {
+        let migration: LegacyMigration
+        try {
+            migration = migrateLegacySession({
+                store: this.app.secretStorage,
+                name: this.settings.sessionSecretName,
+                legacy: this.settings.legacySession,
+                migratedAt: this.settings.legacySecretMigratedAt,
+                now: new Date()
+            })
+        } catch (error: unknown) {
+            log('Could not move the stored session to the secret storage', 'warn', error)
+            return false
+        }
+        if (migration.migrated) {
+            log('Moved the stored session to the secret storage', 'debug')
+        }
+        const changed =
+            migration.migratedAt !== this.settings.legacySecretMigratedAt || migration.dropLegacy
+        if (changed) {
+            this.settings = produce(this.settings, (draft) => {
+                draft.legacySecretMigratedAt = migration.migratedAt
+                if (migration.dropLegacy) {
+                    draft.legacySession = null
+                }
+            })
+        }
+        return changed
+    }
+
+    /**
      * Save the plugin settings
      */
     async saveSettings() {
         log('Saving settings', 'debug')
-        await this.saveData(this.settings)
+        await this.saveData(settingsToDisk(this.settings))
         log('Settings saved', 'debug', this.settings)
     }
 }

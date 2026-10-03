@@ -96,10 +96,9 @@ const clickForget = (): {
 
     const forgetStoredSession = mock(async (): Promise<void> => {})
     const plugin = {
-        settings: {
-            ...createDefaultSettings(),
-            session: { cookies: [], savedAt: '2026-09-28T10:00:00.000Z' }
-        },
+        settings: createDefaultSettings(),
+        storedSession: () => ({ cookies: [], savedAt: '2026-09-28T10:00:00.000Z' }),
+        hasLegacySession: false,
         activityState: null,
         knownSpaces: () => [],
         forgetStoredSession

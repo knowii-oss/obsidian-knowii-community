@@ -8,4 +8,6 @@ See `docs/configuration.md` for the user-facing table. Invariants:
 - Booleans are strict booleans; a string `"false"` never reaches a boolean field.
 - `checkIntervalSeconds` is one of 30, 60, 120, 300, 900, 1800.
 - `notifyCategories` has a strict boolean for every category; missing ones are filled with `true` and written back.
-- `session` is null or a `StoredSession` with at least one live auth cookie (`remember_user_token`, `_circle_session`, `user_session_identifier`); anything else becomes null.
+- `sessionSecretName` is a valid secret id (lowercase alphanumeric with dashes); anything else falls back to `knowii-community-session`.
+- `session` (on disk; `legacySession` in memory) is absent or a `StoredSession` with at least one live auth cookie (`remember_user_token`, `_circle_session`, `user_session_identifier`); anything else is dropped. Legacy, read-only: see Business Rules.
+- `legacySecretMigratedAt` is null or a parsable ISO date.

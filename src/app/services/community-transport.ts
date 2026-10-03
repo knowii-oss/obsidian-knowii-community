@@ -5,8 +5,8 @@ import { cookieHeader, splitSetCookieHeader } from '../domain/session-cookies'
 /**
  * The pane's cookie partition for one vault. Everything signed-in goes
  * through it. Electron partitions are shared by every vault the app opens, so
- * the vault's id is part of the name: a vault never sees (nor stores in its
- * settings) a session signed in from another vault.
+ * the vault's id is part of the name: a vault never sees (nor stores) a
+ * session signed in from another vault.
  */
 export function communityPartition(vaultId: string): string {
     const id = vaultId
@@ -355,12 +355,12 @@ export class HiddenWebviewTransport implements CommunityTransport {
 }
 
 // ---------------------------------------------------------------------------
-// Stored cookies: plain HTTP with the session kept in the plugin settings
+// Stored cookies: plain HTTP with the session kept in the secret storage
 // ---------------------------------------------------------------------------
 
 /**
- * Works anywhere Obsidian runs, mobile included, as long as a session was
- * stored from a desktop sign-in. Cookie updates from the community are
+ * Works anywhere Obsidian runs, mobile included, as long as this device has
+ * a stored session (its secret storage, or the legacy copy in `data.json`). Cookie updates from the community are
  * handed back so the stored session stays current.
  */
 export class StoredCookiesTransport implements CommunityTransport {

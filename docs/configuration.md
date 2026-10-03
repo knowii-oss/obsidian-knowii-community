@@ -25,10 +25,11 @@ nav_order: 3
 | One switch per space            | toggles  | all on                   | Leave a space out of the whole-community watch. Only the spaces you belong to are listed and watched.                                                                      |
 | Folder for saved posts          | text     | `Knowii`                 | Where posts and threads saved as notes go.                                                                                                                                 |
 | Community address               | text     | `https://www.knowii.net` | Only change this if the community moves.                                                                                                                                   |
-| Stored session                  | button   |                          | Shows whether your Knowii session is stored; **Forget** removes it.                                                                                                        |
+| Stored session                  | button   |                          | Shows whether your Knowii session is stored on this device; **Forget** removes it.                                                                                         |
+| Plain-text copy of the session  | button   |                          | Shown while `data.json` still holds the session saved by an older version; **Remove plain-text copy now** removes it.                                                      |
 
 ## Where things are stored
 
-Settings live in the plugin's `data.json`, **including your Knowii session** (the sign-in cookies), so it travels with your vault to your other devices. Keep that file private: anyone with a copy can use your Knowii account.
+Settings live in the plugin's `data.json`. Your Knowii session (the sign-in cookies) does not: it is kept in Obsidian's secret storage, on each device and for each vault, and `data.json` only holds the secret's name (`knowii-community-session`). Older versions kept the session in `data.json`; each device moves that copy to its own secret storage at its next start, and the copy is removed from `data.json` 60 days after the first device did, or right away with **Remove plain-text copy now**.
 
 The page you were on, whether you have seen the welcome card, which items you have already been notified about, what you marked as read or archived, and the recent activity found by watching the whole community are stored per device, in Obsidian's local storage, so they never travel with your vault.

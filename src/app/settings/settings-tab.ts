@@ -17,6 +17,7 @@ import {
     isValidZoomPercent
 } from '../types/plugin-settings.intf'
 import { ACTIVITY_CATEGORIES } from '../domain/community-activity'
+import { LEGACY_SESSION_GRACE_DAYS } from '../domain/session-secret'
 
 /** Prefix of the per-category control keys (`notify:directMessages`, …). */
 const NOTIFY_KEY_PREFIX = 'notify:'
@@ -280,12 +281,14 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                         name: 'Stored session',
                         searchable: true,
                         render: (setting): void => {
-                            const session = this.plugin.settings.session
+                            const session = this.plugin.storedSession()
                             const member = this.plugin.activityState?.member?.name
                             setting.setDesc(
                                 session
-                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in this vault's plugin settings (data.json) since ${new Date(session.savedAt).toLocaleString()}, so every device where this vault syncs gets notifications too. Other vaults never get it: each vault signs in on its own. Anyone with a copy of this vault's .obsidian folder can use it: never share that folder. Signing out of Knowii removes it.`
-                                    : "No sign-in stored for this vault. Sign in once in the Knowii pane on a desktop: the session is then stored in this vault's plugin settings and reaches your other devices with the vault. Other vaults never get it."
+                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in Obsidian's secret storage on this device, for this vault, since ${new Date(session.savedAt).toLocaleString()}. It is not in the plugin settings (data.json), so it does not travel with your vault. Other vaults never get it. Signing out of Knowii removes it.`
+                                    : Platform.isDesktopApp
+                                      ? "No sign-in stored on this device for this vault. Sign in once in the Knowii pane: the session is then kept in Obsidian's secret storage on this device."
+                                      : "No sign-in stored on this device for this vault. The session is kept in Obsidian's secret storage on each device and does not travel with the vault. You can still open Knowii in your browser."
                             )
                             if (session) {
                                 setting.addButton((button) =>
@@ -294,10 +297,10 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                                         .setDestructive()
                                         .onClick(async () => {
                                             // Forgetting stops notifications on
-                                            // every device that relies on it.
+                                            // this device.
                                             const confirmed = await confirmAction(this.app, {
                                                 title: 'Forget the stored session?',
-                                                text: 'Devices that get notifications through this vault, such as your phone, stop getting them. Any desktop signed in to the Knowii pane, this one included, stores the session again at its next check: to remove it for good, sign out in the pane.',
+                                                text: 'This device stops getting notifications, and the plain-text copy left by older versions is removed from data.json. If this desktop is signed in to the Knowii pane, it stores the session again at its next check: to remove it for good, sign out in the pane.',
                                                 confirm: 'Forget',
                                                 destructive: true
                                             })
@@ -309,6 +312,24 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                                         })
                                 )
                             }
+                        }
+                    },
+                    {
+                        name: 'Plain-text copy of the session',
+                        searchable: true,
+                        visible: () => this.plugin.hasLegacySession,
+                        render: (setting): void => {
+                            setting.setDesc(
+                                `Older versions kept your sign-in in data.json, which travels with your vault. Each device moves it to its own secret storage at its next start, and the copy is removed ${LEGACY_SESSION_GRACE_DAYS} days after the first device did. Remove it now once all your devices run this version.`
+                            )
+                            setting.addButton((button) =>
+                                button
+                                    .setButtonText('Remove plain-text copy now')
+                                    .onClick(async () => {
+                                        await this.plugin.removeLegacySessionCopy()
+                                        this.update()
+                                    })
+                            )
                         }
                     }
                 ]
