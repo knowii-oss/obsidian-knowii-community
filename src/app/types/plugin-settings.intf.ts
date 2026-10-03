@@ -95,6 +95,13 @@ export interface PluginSettings {
     legacySession: StoredSession | null
     /** When a device first moved the legacy session to its secret storage (ISO). */
     legacySecretMigratedAt: string | null
+    /**
+     * Also keep the session in `data.json` (field `session`) so devices that
+     * cannot sign in themselves (phones, tablets) get it with the vault.
+     * Opt-in: the file then holds the session in plain text. Decided once for
+     * members upgrading with a session in `data.json` (on), off otherwise.
+     */
+    shareSessionAcrossDevices: boolean
 }
 
 export const MIN_ZOOM_PERCENT = 50
@@ -141,7 +148,8 @@ export function createDefaultSettings(): PluginSettings {
         notesFolder: 'Knowii',
         sessionSecretName: DEFAULT_SESSION_SECRET_NAME,
         legacySession: null,
-        legacySecretMigratedAt: null
+        legacySecretMigratedAt: null,
+        shareSessionAcrossDevices: false
     }
 }
 

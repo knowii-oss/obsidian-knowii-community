@@ -232,7 +232,7 @@ export class CommunityInbox {
             list,
             KNOWII_ICON_ID,
             'Not signed in on this device',
-            "This device has no Knowii session for this vault. Sessions are kept in Obsidian's secret storage on each device and no longer travel with the vault. You can still open Knowii in the browser."
+            "This device has no Knowii session for this vault. Phones and tablets can't sign in themselves: on a desktop where you are signed in, turn on Settings → Advanced → Share session with my other devices, and the session reaches this device with your vault. You can still open Knowii in the browser."
         )
         const buttons = card.createDiv({ cls: `${CLS}-card-buttons` })
         this.cardButton(buttons, 'Open Knowii in the browser', true, () => {

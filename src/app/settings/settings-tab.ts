@@ -278,6 +278,11 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                         }
                     },
                     {
+                        name: 'Share session with my other devices',
+                        desc: "Phones and tablets can't sign in to Knowii themselves. When on, your session is also written to the plugin settings (data.json), which sync with your vault, so they get it. The trade-off: data.json then holds your session in plain text, and anyone with a copy of it can use your Knowii account. While on, that copy is kept up to date and never removed automatically. Turning it off deletes it.",
+                        control: { type: 'toggle', key: 'shareSessionAcrossDevices' }
+                    },
+                    {
                         name: 'Stored session',
                         searchable: true,
                         render: (setting): void => {
@@ -285,10 +290,12 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
                             const member = this.plugin.activityState?.member?.name
                             setting.setDesc(
                                 session
-                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in Obsidian's secret storage on this device, for this vault, since ${new Date(session.savedAt).toLocaleString()}. It is not in the plugin settings (data.json), so it does not travel with your vault. Other vaults never get it. Signing out of Knowii removes it.`
-                                    : Platform.isDesktopApp
-                                      ? "No sign-in stored on this device for this vault. Sign in once in the Knowii pane: the session is then kept in Obsidian's secret storage on this device."
-                                      : "No sign-in stored on this device for this vault. The session is kept in Obsidian's secret storage on each device and does not travel with the vault. You can still open Knowii in your browser."
+                                    ? `Your Knowii sign-in${member ? ` (${member})` : ''} is stored in Obsidian's secret storage on this device, for this vault, since ${new Date(session.savedAt).toLocaleString()}. ${this.plugin.settings.shareSessionAcrossDevices ? 'It is shared with your other devices: the plugin settings (data.json) hold a copy that travels with your vault.' : 'It is not in the plugin settings (data.json), so it does not travel with your vault.'} Other vaults never get it. Signing out of Knowii removes it.`
+                                    : this.plugin.settings.shareSessionAcrossDevices
+                                      ? 'No sign-in stored for this vault. Sign in once in the Knowii pane on a desktop: with sharing on, the session then reaches your other devices with the vault.'
+                                      : Platform.isDesktopApp
+                                        ? "No sign-in stored on this device for this vault. Sign in once in the Knowii pane: the session is then kept in Obsidian's secret storage on this device."
+                                        : "No sign-in stored on this device for this vault. The session is kept in Obsidian's secret storage on each device and does not travel with the vault. You can still open Knowii in your browser."
                             )
                             if (session) {
                                 setting.addButton((button) =>
@@ -409,6 +416,8 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
             return this.plugin.settings[key]
         }
         switch (key) {
+            case 'shareSessionAcrossDevices':
+                return this.plugin.settings.shareSessionAcrossDevices
             case 'checkIntervalSeconds':
                 return String(this.plugin.settings.checkIntervalSeconds)
             case 'desktopNotifications':
@@ -450,6 +459,16 @@ export class KnowiiCommunitySettingTab extends PluginSettingTab {
             await this.plugin.updateSettings((draft) => {
                 draft.notifyCategories[category] = value
             })
+            return
+        }
+        if ('shareSessionAcrossDevices' === key) {
+            if ('boolean' !== typeof value) {
+                throw new Error(`Setting "${key}" expects a boolean.`)
+            }
+            // Copies or deletes the session in data.json, not just the flag.
+            await this.plugin.setShareSession(value)
+            // The session rows depend on it.
+            this.update()
             return
         }
         if (isToggleKey(key)) {

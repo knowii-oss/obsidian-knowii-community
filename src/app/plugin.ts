@@ -36,6 +36,7 @@ import {
 } from './domain/session-cookies'
 import type { LegacyMigration } from './domain/session-secret'
 import {
+    decideShareSession,
     isValidSecretName,
     migrateLegacySession,
     parseIsoDate,
@@ -694,7 +695,7 @@ export class KnowiiCommunityPlugin extends Plugin {
                     void this.activateView()
                 } else {
                     new Notice(
-                        'This device has no Knowii session for this vault. You can open Knowii in your browser.'
+                        'This device has no Knowii session for this vault. On a signed-in desktop, turn on sharing the session with your other devices in the Knowii settings, or open Knowii in your browser.'
                     )
                 }
                 return
@@ -729,7 +730,7 @@ export class KnowiiCommunityPlugin extends Plugin {
             if (!stored) {
                 await this.replaceSession(session)
             } else if (authFingerprint(stored.cookies) !== authFingerprint(cookies)) {
-                this.refreshSession(session)
+                await this.refreshSession(session)
             }
             return
         }
@@ -767,7 +768,7 @@ export class KnowiiCommunityPlugin extends Plugin {
             return
         }
         if (hasAuthCookie(cookies)) {
-            this.refreshSession({ cookies, savedAt: new Date().toISOString() })
+            void this.refreshSession({ cookies, savedAt: new Date().toISOString() })
         } else {
             void this.clearSession()
         }
@@ -776,14 +777,16 @@ export class KnowiiCommunityPlugin extends Plugin {
     /**
      * The session this device uses: its secret storage first, the legacy
      * copy from `data.json` otherwise (moved into the secret storage on the
-     * way). Read on every use, never kept in the settings.
+     * way). When the session is shared, the `data.json` copy wins. Read on
+     * every use, never kept in the settings.
      */
     storedSession(): StoredSession | null {
         try {
             return resolveSession(
                 this.app.secretStorage,
                 this.settings.sessionSecretName,
-                this.settings.legacySession
+                this.settings.legacySession,
+                this.settings.shareSessionAcrossDevices
             )
         } catch (error: unknown) {
             log('Could not read the stored session', 'warn', error)
@@ -791,23 +794,63 @@ export class KnowiiCommunityPlugin extends Plugin {
         }
     }
 
-    /** Whether `data.json` still holds the legacy plain-text session. */
+    /**
+     * Whether `data.json` still holds a plain-text copy left for migration
+     * (not one kept on purpose by sharing).
+     */
     get hasLegacySession(): boolean {
-        return null !== this.settings.legacySession
+        return !this.settings.shareSessionAcrossDevices && null !== this.settings.legacySession
     }
 
     /**
-     * Same sign-in, new cookies: written to this device's secret storage
-     * only. Other devices keep using their own copy.
+     * Same sign-in, new cookies: written to this device's secret storage.
+     * Shared: `data.json` too, so the other devices get them. Not shared:
+     * other devices keep using their own copy.
      */
-    refreshSession(session: StoredSession): void {
+    async refreshSession(session: StoredSession): Promise<void> {
         this.writeSessionSecret(session)
+        if (this.settings.shareSessionAcrossDevices) {
+            await this.writeSharedSession(session)
+        }
     }
 
-    /** A new sign-in: this device's secret storage; the legacy copy is stale now. */
+    /**
+     * A new sign-in: this device's secret storage. Shared: `data.json` too.
+     * Not shared: the legacy copy is stale now and goes.
+     */
     async replaceSession(session: StoredSession): Promise<void> {
         this.writeSessionSecret(session)
-        await this.dropLegacySession()
+        if (this.settings.shareSessionAcrossDevices) {
+            await this.writeSharedSession(session)
+        } else {
+            await this.dropLegacySession()
+        }
+    }
+
+    private async writeSharedSession(session: StoredSession): Promise<void> {
+        await this.updateSettings(
+            (draft) => {
+                draft.legacySession = castDraft(session)
+            },
+            { apply: false }
+        )
+    }
+
+    /**
+     * "Share session with my other devices". On: the session this device has
+     * goes to `data.json` now. Off: this device keeps it in its secret
+     * storage and the `data.json` copy is deleted.
+     */
+    async setShareSession(share: boolean): Promise<void> {
+        // Resolving first makes sure this device's secret holds the session.
+        const current = this.storedSession()
+        await this.updateSettings(
+            (draft) => {
+                draft.shareSessionAcrossDevices = share
+                draft.legacySession = share ? castDraft(current) : null
+            },
+            { apply: false }
+        )
     }
 
     /** Signed out or forgotten: clears this device's secret and the legacy copy. */
@@ -1438,6 +1481,15 @@ export class KnowiiCommunityPlugin extends Plugin {
                 needToSaveSettings = true
             }
             draft.legacySecretMigratedAt = parseIsoDate(data.legacySecretMigratedAt)
+            const share = decideShareSession({
+                stored: data.shareSessionAcrossDevices,
+                legacy: session,
+                migratedAt: draft.legacySecretMigratedAt
+            })
+            draft.shareSessionAcrossDevices = share.share
+            if (share.decided) {
+                needToSaveSettings = true
+            }
         })
 
         if (this.migrateLegacySession()) {
@@ -1493,7 +1545,8 @@ export class KnowiiCommunityPlugin extends Plugin {
                 name: this.settings.sessionSecretName,
                 legacy: this.settings.legacySession,
                 migratedAt: this.settings.legacySecretMigratedAt,
-                now: new Date()
+                now: new Date(),
+                share: this.settings.shareSessionAcrossDevices
             })
         } catch (error: unknown) {
             log('Could not move the stored session to the secret storage', 'warn', error)

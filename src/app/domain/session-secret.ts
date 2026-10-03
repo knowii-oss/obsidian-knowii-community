@@ -9,7 +9,12 @@ import { parseStoredSession } from './session-cookies'
  * Until 1.5 the session was stored in `data.json` (field `session`). That
  * legacy copy stays readable for a grace period so every device where the
  * vault syncs moves its session into its own secret storage on its next
- * start, without signing in again. It is never written with a new value.
+ * start, without signing in again.
+ *
+ * Opt-in sharing (`shareSessionAcrossDevices`): phones and tablets cannot
+ * sign in themselves, so a member can choose to keep the session in
+ * `data.json` too. Then that copy is the shared source: kept up to date,
+ * preferred over the device's secret, and never purged.
  */
 
 /** The part of Obsidian's `SecretStorage` the plugin uses. */
@@ -59,14 +64,46 @@ export function writeSessionSecret(
 export function resolveSession(
     store: SecretStore,
     name: string,
-    legacy: StoredSession | null
+    legacy: StoredSession | null,
+    share = false
 ): StoredSession | null {
     const secret = readSessionSecret(store, name)
-    if (secret || !legacy) {
+    if (!legacy) {
+        return secret
+    }
+    if (share) {
+        // The shared copy is the source; this device's secret follows it.
+        if (!sameSession(secret, legacy)) {
+            writeSessionSecret(store, name, legacy)
+        }
+        return legacy
+    }
+    if (secret) {
         return secret
     }
     writeSessionSecret(store, name, legacy)
     return legacy
+}
+
+function sameSession(a: StoredSession | null, b: StoredSession | null): boolean {
+    return JSON.stringify(a) === JSON.stringify(b)
+}
+
+/**
+ * Whether the session is shared through `data.json`. An explicit choice on
+ * disk wins. Otherwise it is decided once (and then persisted): on for
+ * members who had a session in `data.json` when they moved to the secret
+ * storage (they relied on it reaching their other devices), off otherwise.
+ */
+export function decideShareSession(input: {
+    stored: unknown
+    legacy: StoredSession | null
+    migratedAt: string | null
+}): { share: boolean; decided: boolean } {
+    if ('boolean' === typeof input.stored) {
+        return { share: input.stored, decided: false }
+    }
+    return { share: null !== input.legacy || null !== input.migratedAt, decided: true }
 }
 
 export interface LegacyMigration {
@@ -89,18 +126,22 @@ export function migrateLegacySession(input: {
     legacy: StoredSession | null
     migratedAt: string | null
     now: Date
+    /** Sharing through `data.json`: the copy there wins and is never purged. */
+    share?: boolean
 }): LegacyMigration {
     const { store, name, legacy, now } = input
+    const share = true === input.share
     if (!legacy) {
         return { migrated: false, migratedAt: input.migratedAt, dropLegacy: false }
     }
     let migrated = false
-    if (null === readSessionSecret(store, name)) {
+    const secret = readSessionSecret(store, name)
+    if (null === secret || (share && !sameSession(secret, legacy))) {
         writeSessionSecret(store, name, legacy)
         migrated = true
     }
     const migratedAt = input.migratedAt ?? now.toISOString()
-    const dropLegacy = now.getTime() - Date.parse(migratedAt) >= LEGACY_SESSION_GRACE_MS
+    const dropLegacy = !share && now.getTime() - Date.parse(migratedAt) >= LEGACY_SESSION_GRACE_MS
     return { migrated, migratedAt, dropLegacy }
 }
 

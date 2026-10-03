@@ -133,10 +133,10 @@ Members who are not admins never see any of it.
 The plugin stores your Knowii session (the sign-in cookies of the pane) in Obsidian's secret storage. It is kept on each device and for each vault: it does not travel with your vault, and signing in from one vault never signs in another vault on the same computer. This is what makes the notifications work:
 
 - on a desktop, checks use the pane's own session; the stored copy is kept in step with it;
-- on mobile, the plugin checks with the session stored on that device;
+- on mobile, the plugin checks with the session stored on that device. Phones and tablets can't sign in themselves: they get the session through **Share session with my other devices** (Settings → Advanced), which also keeps it in `data.json` so it travels with your vault. That file then holds your session in plain text: treat it like a password. The setting is on if you had the session in `data.json` before 1.5.1, off for new installs; turning it off deletes the copy;
 - on a desktop where the pane has no session yet, the stored one signs the pane in.
 
-Older versions kept the session in the plugin settings (`.obsidian/plugins/knowii-community/data.json`), which travel with your vault. Every device that had it moves it to its own secret storage at its next start, so you stay signed in everywhere without doing anything. The plain-text copy stays in `data.json` for 60 days so your other devices can pick it up, then it is removed. Once all your devices run this version, you can remove it right away with **Remove plain-text copy now** under Settings → Advanced.
+Older versions kept the session in the plugin settings (`.obsidian/plugins/knowii-community/data.json`), which travel with your vault. Every device that had it moves it to its own secret storage at its next start, so you stay signed in everywhere without doing anything. With sharing off, the plain-text copy stays in `data.json` for 60 days so your other devices can pick it up, then it is removed. Once all your devices run this version, you can remove it right away with **Remove plain-text copy now** under Settings → Advanced. With sharing on, the copy is kept up to date instead and never removed automatically.
 
 Signing out of Knowii (profile menu, in the pane) ends the session and the plugin forgets it on that device; **Forget** under Settings → Advanced → Stored session removes the stored copy from this device without signing you out of the pane.
 
@@ -184,7 +184,7 @@ The Obsidian mobile apps cannot show the community itself inside a pane, so ther
 - the header has **Check now**, **Upcoming events**, **Ask the community**, and a menu with **Mark all as read**, **Archive read**, **Open Knowii in the browser** (and the admin pages for admins);
 - **Mark all as read** and **Archive read** also sit at the bottom of the list.
 
-The inbox uses the session stored on the phone or tablet. Devices that had it from an older version keep it; the session no longer travels with your vault, so a device without one shows a card that offers the browser.
+The inbox uses the session stored on the phone or tablet. Phones and tablets can't sign in themselves: turn on **Share session with my other devices** on a signed-in desktop and the session reaches them with your vault. Without it, a device without a session shows a card that explains this and offers the browser.
 
 The pane, the "what's new" list and the compose windows adapt to the space they have, from a phone to a wide monitor: in a narrow sidebar the toolbar keeps its icons and folds the shortcuts into a **Go to** menu; on touch screens buttons are finger-sized and the actions of each item are always shown.
 

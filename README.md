@@ -61,6 +61,7 @@ Knowii is a community of practice for knowledge workers who want to organize the
 - Signing out happens inside Knowii, like in a browser: open your profile menu and sign out.
 - The community keeps its own session, separate from your browser's, and separate for each vault: a new vault starts signed out.
 - **Your Knowii session is stored in Obsidian's secret storage**, on each device and for each vault, not in the plugin settings (`data.json`): it no longer travels with your vault. That is what lets the plugin check for new activity in the background. Devices that had the session from an older version move it to their secret storage automatically at their next start; the plain-text copy older versions left in `data.json` is removed after 60 days, or right away with **Remove plain-text copy now** under Settings → Advanced. Sign out of Knowii, or use **Forget** under Settings → Advanced → Stored session, to remove the session from a device.
+- **Phones and tablets can't sign in to Knowii themselves.** To get notifications there, turn on **Share session with my other devices** (Settings → Advanced): the session is then also kept in `data.json`, which syncs with your vault. The trade-off: that file then holds your session in plain text, and anyone with a copy can use your Knowii account. It is on for members who had the session in `data.json` before 1.5.1, off for new installs. Turning it off deletes the copy.
 - Notifications read the same pages the Knowii web app reads, as you. Nothing is marked as read until you open it.
 
 ## Documentation

@@ -12,6 +12,10 @@ The pane uses a persistent partition dedicated to the plugin and to the vault (`
 
 Until 1.5 the session was in `data.json` (`session`). It stays there read-only as a bootstrap: on every load, every device copies it into its own secret storage when it has none; reads prefer the secret storage and fall back to it. New values never go to `data.json`. A refresh (same sign-in, new cookies) writes this device's secret only and keeps the legacy copy; a new sign-in writes the secret and deletes the legacy copy; sign-out or Forget clears this device's secret (`''`, no delete API) and deletes the legacy copy. `legacySecretMigratedAt` records the first migration; the legacy copy is deleted 60 days later, or with the "Remove plain-text copy now" button.
 
+## Sharing the session through data.json is opt-in
+
+Phones and tablets cannot sign in (no `<webview>`), so `shareSessionAcrossDevices` ("Share session with my other devices") also keeps the session in `data.json` (`session`). Default decided once on load and persisted: on when `data.json` had a session or a `legacySecretMigratedAt` (members who relied on it before 1.5.1), off otherwise (fresh installs). On: sign-ins and cookie refreshes also write `data.json`, the `data.json` copy wins over the device's secret (the secret follows it), no 60-day purge, the removal row is hidden. Off: the rules above. Turning it on writes the device's session to `data.json`; turning it off deletes it. Sign-out and Forget clear both in either mode. Decision: Sébastien, 2026-10-03.
+
 ## Never sign the member back in behind their back
 
 A stored session is put back into the pane only when the pane has none at the start of a run. If the member was signed in during this run and is now signed out, they signed out (or the session ended): the stored session is dropped, never restored.

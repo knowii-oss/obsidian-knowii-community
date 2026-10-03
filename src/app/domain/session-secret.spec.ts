@@ -2,6 +2,7 @@ import { describe, expect, test } from 'bun:test'
 import type { StoredSession } from './session-cookies'
 import {
     DEFAULT_SESSION_SECRET_NAME,
+    decideShareSession,
     LEGACY_SESSION_GRACE_DAYS,
     isValidSecretName,
     migrateLegacySession,
@@ -189,5 +190,58 @@ describe('parseIsoDate', () => {
         expect(parseIsoDate('yesterday')).toBeNull()
         expect(parseIsoDate(42)).toBeNull()
         expect(parseIsoDate(undefined)).toBeNull()
+    })
+})
+
+describe('sharing through data.json', () => {
+    const now = new Date('2026-10-03T12:00:00.000Z')
+
+    test('resolveSession prefers the shared copy and syncs the secret to it', () => {
+        const store = new FakeSecretStore()
+        writeSessionSecret(store, NAME, session('stale'))
+        expect(resolveSession(store, NAME, session('shared'), true)).toEqual(session('shared'))
+        expect(readSessionSecret(store, NAME)).toEqual(session('shared'))
+    })
+
+    test('migration overwrites a differing secret and never drops the shared copy', () => {
+        const store = new FakeSecretStore()
+        writeSessionSecret(store, NAME, session('stale'))
+        const result = migrateLegacySession({
+            store,
+            name: NAME,
+            legacy: session('shared'),
+            migratedAt: '2026-01-01T00:00:00.000Z',
+            now,
+            share: true
+        })
+        expect(result.migrated).toBe(true)
+        expect(result.dropLegacy).toBe(false)
+        expect(readSessionSecret(store, NAME)).toEqual(session('shared'))
+    })
+
+    test('the default: explicit choice, else on when a session was in data.json', () => {
+        expect(
+            decideShareSession({ stored: false, legacy: session('a'), migratedAt: null })
+        ).toEqual({
+            share: false,
+            decided: false
+        })
+        expect(
+            decideShareSession({ stored: undefined, legacy: session('a'), migratedAt: null })
+        ).toEqual({
+            share: true,
+            decided: true
+        })
+        expect(
+            decideShareSession({
+                stored: undefined,
+                legacy: null,
+                migratedAt: '2026-10-01T00:00:00.000Z'
+            })
+        ).toEqual({ share: true, decided: true })
+        expect(decideShareSession({ stored: undefined, legacy: null, migratedAt: null })).toEqual({
+            share: false,
+            decided: true
+        })
     })
 })
